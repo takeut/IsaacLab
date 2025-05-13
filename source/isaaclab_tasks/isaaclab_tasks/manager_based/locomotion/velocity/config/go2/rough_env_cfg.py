@@ -51,13 +51,25 @@ class UnitreeGo2RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.rewards.feet_air_time.params["sensor_cfg"].body_names = ".*_foot"
         self.rewards.feet_air_time.weight = 0.01
         self.rewards.undesired_contacts = None
-        self.rewards.dof_torques_l2.weight = -0.0002
-        self.rewards.track_lin_vel_xy_exp.weight = 1.5
-        self.rewards.track_ang_vel_z_exp.weight = 0.75
-        self.rewards.dof_acc_l2.weight = -2.5e-7
+
+        # takeut write; より安定した歩行のための報酬重み調整
+        #self.rewards.dof_torques_l2.weight = -0.0002
+        #self.rewards.track_lin_vel_xy_exp.weight = 1.5
+        #self.rewards.track_ang_vel_z_exp.weight = 0.75
+        #self.rewards.dof_acc_l2.weight = -2.5e-7
+        self.rewards.dof_torques_l2.weight = -0.0001 # 関節トルクの使用制限を緩める, より強い支持力の使用を許容
+        self.rewards.track_lin_vel_xy_exp.weight = 0.8 # より穏やかな速度指令への追従を促す,急激な動作を抑制し、安定性を向上
+        self.rewards.track_ang_vel_z_exp.weight = 0.5 # 回転動作を抑制,より直線的な動作を促進
+        self.rewards.dof_acc_l2.weight = -1.0e-7 # より滑らかな加速を可能に, 急激な動作変化を抑制しつつ、必要な動作は許容
 
         # terminations
         self.terminations.base_contact.params["sensor_cfg"].body_names = "base"
+
+        #add by kobayashi 
+        if hasattr(self.observations.policy, "height_scan"):
+            del self.observations.policy.height_scan
+        if hasattr(self.observations.policy, "base_lin_vel"):
+            del self.observations.policy.base_lin_vel
 
 
 @configclass
