@@ -197,3 +197,6 @@ class RslRlOnPolicyRunnerCfg:
 
     If regex expression, the latest (alphabetical order) matching file will be loaded.
     """
+
+    obs_delay_steps: int = 0
+    """Number of action delay steps to simulate motor latency. Default is 0."""
