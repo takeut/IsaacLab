@@ -55,14 +55,14 @@ class UnitreeGo2RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         # rewards for feet
         self.rewards.feet_air_time.params["sensor_cfg"].body_names = ".*_foot"
         self.rewards.feet_air_time.weight = 0.01
-        self.rewards.feet_clearance.weight = 25.0
+        self.rewards.feet_clearance.weight = 17.0
         self.rewards.feet_clearance.params["threshold"] = 0.1
 
         # self.rewards.undesired_contacts = None
 
         # reward for move
-        self.rewards.dof_torques_l2.weight = -0.0001 # 関節トルクの使用制限を緩める, より強い支持力の使用を許容
-        self.rewards.track_lin_vel_xy_exp.weight = 0.7 # より穏やかな速度指令への追従を促す,急激な動作を抑制し、安定性を向上
+        self.rewards.dof_torques_l2.weight = -0.000005 # 関節トルクの使用制限を緩める, より強い支持力の使用を許容
+        self.rewards.track_lin_vel_xy_exp.weight = 0.8 # より穏やかな速度指令への追従を促す,急激な動作を抑制し、安定性を向上
         self.rewards.track_ang_vel_z_exp.weight = 0.3 # 回転動作を抑制,より直線的な動作を促進
         self.rewards.dof_acc_l2.weight = -2.8e-7 # より滑らかな加速を可能に, 急激な動作変化を抑制しつつ、必要な動作は許容
 
@@ -70,22 +70,22 @@ class UnitreeGo2RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.terminations.base_contact.params["sensor_cfg"].body_names = "base"
 
         # reward for stability
-        self.rewards.base_height_l2.weight = -30.0
+        self.rewards.base_height_l2.weight = -60.0
         self.rewards.flat_orientation_l2.weight = -1.8
-        self.rewards.ang_vel_xy_l2.weight = -0.05
+        self.rewards.ang_vel_xy_l2.weight = -0.1
 
         self.rewards.joint_pos_limits.weight = -10.0
 
         self.commands.base_velocity.ranges.lin_vel_x = (-1.0, 1.0)
         self.commands.base_velocity.ranges.lin_vel_y = (-1.0, 1.0)
         self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
-        self.commands.base_velocity.rel_standing_envs = 0.1
+        self.commands.base_velocity.rel_standing_envs = 0.07
 
         self.events.add_base_mass.params["mass_distribution_params"] = (-1.0, 3.0)
         self.events.physics_material.static_friction_range = (0.6, 1.0)
         self.events.physics_material.dynamic_friction_range = (0.6, 1.25)
 
-        self.actions.joint_pos.scale= 0.4
+        self.actions.joint_pos.scale= 0.45
 
 @configclass
 class UnitreeGo2RoughEnvCfg_PLAY(UnitreeGo2RoughEnvCfg):

@@ -192,6 +192,19 @@ class DCMotorCfg(IdealPDActuatorCfg):
 
     saturation_effort: float = MISSING
     """Peak motor force/torque of the electric DC motor (in N-m)."""
+    
+
+@configclass
+class DelayedDCMotorCfg(DCMotorCfg):
+    min_delay: int = 0
+
+    max_delay: int = 10
+    """Maximum number of physics time-steps with which the actuator command may be delayed. Defaults to 0."""
+    """takeut write: 
+        実機では通信遅延を考慮して、より長いバッファ長が必要かもしれない
+        シミュレータ: 0-1程度
+        実機推奨: dt 5ms なので 10 で 10ms
+    """
 
 
 @configclass
@@ -253,12 +266,12 @@ class DelayedPDActuatorCfg(IdealPDActuatorCfg):
     min_delay: int = 0
     """Minimum number of physics time-steps with which the actuator command may be delayed. Defaults to 0."""
 
-    max_delay: int = 3 
+    max_delay: int = 10
     """Maximum number of physics time-steps with which the actuator command may be delayed. Defaults to 0."""
     """takeut write: 
         実機では通信遅延を考慮して、より長いバッファ長が必要かもしれない
         シミュレータ: 0-1程度
-        実機推奨: 2-3程度
+        実機推奨: dt 5ms なので 10 で 10ms
     """
 
 

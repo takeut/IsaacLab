@@ -28,6 +28,7 @@ from .actuator_cfg import (
     ActuatorNetLSTMCfg,
     ActuatorNetMLPCfg,
     DCMotorCfg,
+    DelayedDCMotorCfg,
     DelayedPDActuatorCfg,
     IdealPDActuatorCfg,
     ImplicitActuatorCfg,
