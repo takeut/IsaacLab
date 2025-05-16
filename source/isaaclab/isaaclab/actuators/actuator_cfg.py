@@ -256,7 +256,7 @@ class DelayedPDActuatorCfg(IdealPDActuatorCfg):
     max_delay: int = 3 
     """Maximum number of physics time-steps with which the actuator command may be delayed. Defaults to 0."""
     """takeut write: 
-        実機では通信遅延を考慮して、より長いバッファ長が必要かもし
+        実機では通信遅延を考慮して、より長いバッファ長が必要かもしれない
         シミュレータ: 0-1程度
         実機推奨: 2-3程度
     """

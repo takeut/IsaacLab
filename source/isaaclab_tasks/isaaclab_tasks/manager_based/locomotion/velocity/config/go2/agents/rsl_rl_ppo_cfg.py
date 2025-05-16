@@ -35,6 +35,9 @@ class UnitreeGo2RoughPPORunnerCfg(RslRlOnPolicyRunnerCfg):
         desired_kl=0.01,
         max_grad_norm=1.0,
     )
+    runner = RslRlOnPolicyRunnerCfg(
+        obs_delay_steps = 0
+    )
 
 
 @configclass
@@ -46,3 +49,19 @@ class UnitreeGo2FlatPPORunnerCfg(UnitreeGo2RoughPPORunnerCfg):
         self.experiment_name = "unitree_go2_flat"
         self.policy.actor_hidden_dims = [128, 128, 128]
         self.policy.critic_hidden_dims = [128, 128, 128]
+
+        # solution of exploresion
+        # self.policy.init_noise_std = 0.6
+        # self.algorithm.value_loss_coef = 0.05
+        # self.algorithm.learning_rate = 0.0005
+        # self.algorithm.desired_kl = 0.03
+        # self.algorithm.entropy_coef = 0.03
+        # self.empirical_normalization = True
+        
+        # #normal
+        self.policy.init_noise_std = 1.0
+        self.algorithm.value_loss_coef = 1.0
+        self.algorithm.learning_rate = 0.001
+        self.empirical_normalization = False
+
+        self.runner.obs_delay_steps = 0

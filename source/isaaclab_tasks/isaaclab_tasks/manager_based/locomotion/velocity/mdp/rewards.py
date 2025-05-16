@@ -83,6 +83,57 @@ def feet_slide(env, sensor_cfg: SceneEntityCfg, asset_cfg: SceneEntityCfg = Scen
     return reward
 
 
+def feet_clearance(env: ManagerBasedRLEnv, command_name: str, asset_cfg: SceneEntityCfg, sensor_cfg: SceneEntityCfg, threshold: float) -> torch.Tensor:
+    # extract the used quantities (to enable type-hinting)
+    #print("sensor_cfg.name ", sensor_cfg.name) #sensor_cfg.name  feet_position
+    frame_transformer: FrameTransformer = env.scene.sensors[sensor_cfg.name]
+    asset: RigidObject = env.scene[asset_cfg.name]
+    #print("sensor_cfg.body_ids ", sensor_cfg.body_ids) #slice(None, None, None
+    #feet_positon = frame_transformer.data.target_pos_w[:, sensor_cfg.body_ids]
+    #print("feet_positon ", feet_positon) #torch.Size([num_envs, 4, 3])
+
+    # feet_x = frame_transformer.data.target_pos_w[:, :, 0]
+    # feet_y = frame_transformer.data.target_pos_w[:, :, 1]
+    # print("feet_x ", feet_x)
+    # print("feet_y ", feet_y)
+
+    feet_height = frame_transformer.data.target_pos_w[:, :, 2]
+    #print("feet_height ", feet_height)
+    #body_lin_vel = asset.data.body_lin_vel_w #torch.Size([2048, 17, 3])
+    feet_lin_vel = asset.data.body_lin_vel_w[:, 13:17, :] #torch.Size([2048, 4, 3])
+   
+    # Compute the height deviation
+    height_deviation = threshold - feet_height  # Shape: [batch_size, num_feet]
+    #print("height_deviation ", height_deviation)
+    # Compute the squared deviation
+    squared_deviation = height_deviation**2  # Shape: [batch_size, num_feet]
+    #abs_deviation = abs(height_deviation)
+    #ten_times_abs_deviation = abs(height_deviation) * 10
+
+    # Compute the magnitude of the linear velocity in the xy-plane
+    # Here we use the sum of squares in the xy-plane, ignoring the z-component
+    lin_vel_xy = torch.norm(feet_lin_vel[:, :, :2], dim=2)  # Shape: [batch_size, num_feet]
+    # lin_vel_xy = torch.clamp(lin_vel_xy, min=0, max=1)  # Shape: [batch_size, num_feet]
+    #print("lin_vel_xy ", lin_vel_xy)
+    #lin_vel_xy = torch.norm(feet_lin_vel[:, :, :2], dim=2)**0.5
+
+    # height_deviation = torch.sum(feet_height -threshold)
+    # foot_clearance_reward = torch.sum(height_deviation * lin_vel_xy, dim=1)
+
+    # Compute the foot clearance reward term
+    # I want deviation -> small -> foot_clerance_reward is negative but close to 0
+    # clearance = torch.clamp(feet_height - threshold, min=0.0, max = 0.04)
+
+    # foot_clearance_reward = torch.sum(clearance * lin_vel_xy, dim=1)  # Shape: [batch_size]
+    foot_clearance_reward = -torch.sum(squared_deviation * lin_vel_xy, dim=1)  # Shape: [batch_size]
+    #foot_clearance_reward = -torch.sum(abs_deviation * lin_vel_xy, dim=1)
+    #foot_clearance_reward = -torch.sum(ten_times_abs_deviation * lin_vel_xy, dim=1)
+
+    #print("foot_clearance_reward ", foot_clearance_reward)
+
+    return foot_clearance_reward
+
+
 def track_lin_vel_xy_yaw_frame_exp(
     env, std: float, command_name: str, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
 ) -> torch.Tensor:
