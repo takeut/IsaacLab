@@ -51,13 +51,13 @@ class UnitreeGo2FlatPPORunnerCfg(UnitreeGo2RoughPPORunnerCfg):
         self.policy.critic_hidden_dims = [128, 128, 128]
 
         # 安定した学習のための設定
-        self.policy.init_noise_std = 0.5  # 探索ノイズをさらに減らす
-        self.algorithm.value_loss_coef = 0.01  # 値関数の損失係数をさらに小さくする
-        self.algorithm.learning_rate = 0.0003  # 学習率をさらに小さくする
-        self.algorithm.max_grad_norm = 0.5  # 勾配のノルム制限を強化
-        self.algorithm.desired_kl = 0.02  # KLダイバージェンスの目標値を調整
-        self.algorithm.entropy_coef = 0.02  # エントロピー係数を調整
-        self.empirical_normalization = True  # 経験的正規化を有効にする
+        self.policy.init_noise_std = 1.0  # 探索を促進
+        self.algorithm.value_loss_coef = 0.5  # 値関数の損失係数を調整
+        self.algorithm.learning_rate = 0.0005  # 学習率を調整
+        self.algorithm.max_grad_norm = 1.0  # 勾配のノルム制限を調整
+        self.algorithm.desired_kl = 0.01  # KLダイバージェンスの目標値を調整
+        self.algorithm.entropy_coef = 0.005  # エントロピー係数を調整
+        self.empirical_normalization = False  # 経験的正規化を無効化
         
         # #normal
         # self.policy.init_noise_std = 1.0

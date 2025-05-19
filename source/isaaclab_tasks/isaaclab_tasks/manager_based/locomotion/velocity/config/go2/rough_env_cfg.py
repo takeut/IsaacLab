@@ -52,19 +52,19 @@ class UnitreeGo2RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
             },
         }
 
-        # rewards for feet
+        # rewards for feet - feet_clearanceはエラーの原因となるため無効化
         self.rewards.feet_air_time.params["sensor_cfg"].body_names = ".*_foot"
-        self.rewards.feet_air_time.weight = 0.01
-        self.rewards.feet_clearance.weight = 20.0  # 足のクリアランスに対する報酬を強化
-        self.rewards.feet_clearance.params["threshold"] = 0.12  # しきい値を少し上げる
+        self.rewards.feet_air_time.weight = 0.0  # 無効化
+        self.rewards.feet_clearance.weight = 0.0  # 無効化（エラーの原因となるため）
+        self.rewards.feet_clearance.params["threshold"] = 0.12
 
         # self.rewards.undesired_contacts = None
 
         # reward for move
-        self.rewards.dof_torques_l2.weight = -0.000005 # 関節トルクの使用制限を緩める, より強い支持力の使用を許容
-        self.rewards.track_lin_vel_xy_exp.weight = 0.8 # より穏やかな速度指令への追従を促す,急激な動作を抑制し、安定性を向上
-        self.rewards.track_ang_vel_z_exp.weight = 0.3 # 回転動作を抑制,より直線的な動作を促進
-        self.rewards.dof_acc_l2.weight = -2.8e-7 # より滑らかな加速を可能に, 急激な動作変化を抑制しつつ、必要な動作は許容
+        self.rewards.dof_torques_l2.weight = -0.0002  # 関節トルクの使用に対するペナルティを強化
+        self.rewards.track_lin_vel_xy_exp.weight = 1.5  # 線形速度の追跡報酬を強化（前後左右の歩行性能向上）
+        self.rewards.track_ang_vel_z_exp.weight = 0.75  # 角速度の追跡報酬を強化（回転性能向上）
+        self.rewards.dof_acc_l2.weight = -2.8e-7  # より滑らかな加速を可能に, 急激な動作変化を抑制しつつ、必要な動作は許容
 
         # terminations
         self.terminations.base_contact.params["sensor_cfg"].body_names = "base"
