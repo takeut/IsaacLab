@@ -71,11 +71,10 @@ class UnitreeGo2RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
 
         # reward for stability
         self.rewards.base_height_l2.weight = -60.0
-        self.rewards.flat_orientation_l2.weight = -3.0  # 平らな姿勢を維持するためのペナルティを強化
-        self.rewards.ang_vel_xy_l2.weight = -0.2  # XY平面での角速度に対するペナルティを強化
+        self.rewards.flat_orientation_l2.weight = -1.0  # 平らな姿勢を維持するためのペナルティを強化
+        self.rewards.ang_vel_xy_l2.weight = -0.05  # XY平面での角速度に対するペナルティを強化
 
-        self.rewards.joint_pos_limits.weight = -15.0  # 関節位置の制限に対するペナルティを強化
-
+        self.rewards.joint_pos_limits.weight = -10.0  # 関節位置の制限に対するペナルティを強化
         self.commands.base_velocity.ranges.lin_vel_x = (-1.0, 1.0)
         self.commands.base_velocity.ranges.lin_vel_y = (-1.0, 1.0)
         self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
