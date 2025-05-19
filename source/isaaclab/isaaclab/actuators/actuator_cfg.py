@@ -196,7 +196,7 @@ class DCMotorCfg(IdealPDActuatorCfg):
 
 @configclass
 class DelayedDCMotorCfg(DCMotorCfg):
-    min_delay: int = 0
+    min_delay: int = 2
 
     max_delay: int = 10
     """Maximum number of physics time-steps with which the actuator command may be delayed. Defaults to 0."""
