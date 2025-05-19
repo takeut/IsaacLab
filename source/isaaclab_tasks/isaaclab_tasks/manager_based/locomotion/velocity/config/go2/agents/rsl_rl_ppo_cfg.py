@@ -50,13 +50,14 @@ class UnitreeGo2FlatPPORunnerCfg(UnitreeGo2RoughPPORunnerCfg):
         self.policy.actor_hidden_dims = [128, 128, 128]
         self.policy.critic_hidden_dims = [128, 128, 128]
 
-        # solution of exploresion
-        self.policy.init_noise_std = 0.6
-        self.algorithm.value_loss_coef = 0.05
-        self.algorithm.learning_rate = 0.0005
-        self.algorithm.desired_kl = 0.03
-        self.algorithm.entropy_coef = 0.03
-        self.empirical_normalization = True
+        # 安定した学習のための設定
+        self.policy.init_noise_std = 0.5  # 探索ノイズをさらに減らす
+        self.algorithm.value_loss_coef = 0.01  # 値関数の損失係数をさらに小さくする
+        self.algorithm.learning_rate = 0.0003  # 学習率をさらに小さくする
+        self.algorithm.max_grad_norm = 0.5  # 勾配のノルム制限を強化
+        self.algorithm.desired_kl = 0.02  # KLダイバージェンスの目標値を調整
+        self.algorithm.entropy_coef = 0.02  # エントロピー係数を調整
+        self.empirical_normalization = True  # 経験的正規化を有効にする
         
         # #normal
         # self.policy.init_noise_std = 1.0
@@ -65,4 +66,4 @@ class UnitreeGo2FlatPPORunnerCfg(UnitreeGo2RoughPPORunnerCfg):
         # self.empirical_normalization = False
 
         # モーターの遅延をシミュレートするためのアクション遅延ステップの数
-        self.runner.obs_delay_steps = 10
+        # self.runner.obs_delay_steps = 10

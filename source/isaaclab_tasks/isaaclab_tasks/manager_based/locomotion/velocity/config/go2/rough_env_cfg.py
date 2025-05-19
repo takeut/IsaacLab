@@ -35,7 +35,7 @@ class UnitreeGo2RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.actions.joint_pos.scale = 0.25
 
         # event
-        self.events.push_robot = None
+        # self.events.push_robot = None  # コメントアウト（velocity_env_cfgでpush_robotがコメントアウトされているため）
         self.events.add_base_mass.params["mass_distribution_params"] = (-1.0, 3.0)
         self.events.add_base_mass.params["asset_cfg"].body_names = "base"
         self.events.base_external_force_torque.params["asset_cfg"].body_names = "base"
@@ -55,8 +55,8 @@ class UnitreeGo2RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         # rewards for feet
         self.rewards.feet_air_time.params["sensor_cfg"].body_names = ".*_foot"
         self.rewards.feet_air_time.weight = 0.01
-        self.rewards.feet_clearance.weight = 17.0
-        self.rewards.feet_clearance.params["threshold"] = 0.1
+        self.rewards.feet_clearance.weight = 20.0  # 足のクリアランスに対する報酬を強化
+        self.rewards.feet_clearance.params["threshold"] = 0.12  # しきい値を少し上げる
 
         # self.rewards.undesired_contacts = None
 
@@ -71,10 +71,10 @@ class UnitreeGo2RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
 
         # reward for stability
         self.rewards.base_height_l2.weight = -60.0
-        self.rewards.flat_orientation_l2.weight = -1.8
-        self.rewards.ang_vel_xy_l2.weight = -0.1
+        self.rewards.flat_orientation_l2.weight = -3.0  # 平らな姿勢を維持するためのペナルティを強化
+        self.rewards.ang_vel_xy_l2.weight = -0.2  # XY平面での角速度に対するペナルティを強化
 
-        self.rewards.joint_pos_limits.weight = -10.0
+        self.rewards.joint_pos_limits.weight = -15.0  # 関節位置の制限に対するペナルティを強化
 
         self.commands.base_velocity.ranges.lin_vel_x = (-1.0, 1.0)
         self.commands.base_velocity.ranges.lin_vel_y = (-1.0, 1.0)
@@ -108,7 +108,7 @@ class UnitreeGo2RoughEnvCfg_PLAY(UnitreeGo2RoughEnvCfg):
         self.observations.policy.enable_corruption = False
         # remove random pushing event
         self.events.base_external_force_torque = None
-        self.events.push_robot = None
+        # self.events.push_robot = None  # コメントアウト（velocity_env_cfgでpush_robotがコメントアウトされているため）
 
         #add by kobayashi 
         if hasattr(self.observations.policy, "height_scan"):
