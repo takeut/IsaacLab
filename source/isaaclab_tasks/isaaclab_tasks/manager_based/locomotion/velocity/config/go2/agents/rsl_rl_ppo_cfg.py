@@ -11,8 +11,8 @@ from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlPpoActorCriticCfg, R
 @configclass
 class UnitreeGo2RoughPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
-    max_iterations = 1500
-    save_interval = 50
+    max_iterations = 1000000
+    save_interval = 10000
     experiment_name = "unitree_go2_rough"
     empirical_normalization = False
     policy = RslRlPpoActorCriticCfg(
@@ -28,7 +28,7 @@ class UnitreeGo2RoughPPORunnerCfg(RslRlOnPolicyRunnerCfg):
         entropy_coef=0.01,
         num_learning_epochs=5,
         num_mini_batches=4,
-        learning_rate=1.0e-3,
+        learning_rate=1.0e-3
         schedule="adaptive",
         gamma=0.99,
         lam=0.95,
@@ -45,19 +45,19 @@ class UnitreeGo2FlatPPORunnerCfg(UnitreeGo2RoughPPORunnerCfg):
     def __post_init__(self):
         super().__post_init__()
 
-        self.max_iterations = 300
+        self.max_iterations = 100000
         self.experiment_name = "unitree_go2_flat"
-        self.policy.actor_hidden_dims = [128, 128, 128]
-        self.policy.critic_hidden_dims = [128, 128, 128]
+        # self.policy.actor_hidden_dims = [128, 128, 128]
+        # self.policy.critic_hidden_dims = [128, 128, 128]
 
         # さらに安定した学習のための設定
         self.policy.init_noise_std = 0.8  # 探索ノイズを少し減らす
         self.algorithm.value_loss_coef = 0.2  # 値関数の損失係数をさらに小さくする
-        self.algorithm.learning_rate = 0.0003  # 学習率をさらに小さくする
+        self.algorithm.learning_rate = 1.0e-4  # 学習率をさらに小さくする
         self.algorithm.max_grad_norm = 0.8  # 勾配のノルム制限を強化
         self.algorithm.clip_param = 0.1  # クリッピングパラメータを小さくして更新を安定化
         self.algorithm.desired_kl = 0.007  # KLダイバージェンスの目標値を小さくする
-        self.algorithm.entropy_coef = 0.01  # エントロピー係数を増やして探索を促進
+        # self.algorithm.entropy_coef = 0.01  # エントロピー係数を増やして探索を促進
         self.empirical_normalization = True  # 経験的正規化を有効にして入力の分布を安定化
         
         # #normal

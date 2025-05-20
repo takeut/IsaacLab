@@ -19,7 +19,7 @@ from isaaclab.assets import Articulation, RigidObject
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers.manager_base import ManagerTermBase
 from isaaclab.managers.manager_term_cfg import ObservationTermCfg
-from isaaclab.sensors import Camera, Imu, RayCaster, RayCasterCamera, TiledCamera
+from isaaclab.sensors import Camera, Imu, RayCaster, RayCasterCamera, TiledCamera, ContactSensor, FrameTransformer
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedEnv, ManagerBasedRLEnv
@@ -598,3 +598,192 @@ Commands.
 def generated_commands(env: ManagerBasedRLEnv, command_name: str) -> torch.Tensor:
     """The generated command from command term in the command manager with the given name."""
     return env.command_manager.get_command(command_name)
+
+
+"""
+Customs.
+
+"""
+
+def contact(env: ManagerBasedRLEnv, threshold: float, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
+    # extract the used quantities (to enable type-hinting)
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    # check if contact force is above threshold
+    net_contact_forces = contact_sensor.data.net_forces_w_history
+    is_contact = torch.max(torch.norm(net_contact_forces[:, :, sensor_cfg.body_ids], dim=-1), dim=1)[0] > threshold
+    is_contact = is_contact.int() #1 or 0
+    #print("is_contact feet ", is_contact) #True or False
+    # foot_net_contact_forces_history_latest = torch.max(torch.norm(net_contact_forces[:, :, sensor_cfg.body_ids], dim=-1), dim=1)[0]
+    return is_contact
+
+
+def feet_height(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
+    frame_transformer: FrameTransformer = env.scene.sensors[sensor_cfg.name]
+    feet_height = frame_transformer.data.target_pos_w[:, :, 2]
+    return feet_height
+
+def feet_position(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
+    frame_transformer: FrameTransformer = env.scene.sensors[sensor_cfg.name]
+    feet_position = frame_transformer.data.target_pos_w[:, :, :]
+    return feet_position.view(env.num_envs, -1)
+
+
+
+# def random_mass(env: ManagerBasedRLEnv,values: torch.Tensor) -> torch.Tensor:
+#     # print("mass values ", values.shape) #torch.Size([2048, 19])
+#     # print(values)
+#     # breakpoint()
+#     return values
+
+# def static_friction_values(env: ManagerBasedRLEnv,values: torch.Tensor) -> torch.Tensor:
+#     # print("static values ", values.shape) #torch.Size([64])
+#     # print(values)
+#     # breakpoint()
+#     return values
+
+# def dynamic_friction_values(env: ManagerBasedRLEnv,values: torch.Tensor) -> torch.Tensor:
+#     # print("dynamic values ", values.shape)
+#     # print(values)
+#     # breakpoint()
+#     return values
+
+# def restitution_values(env: ManagerBasedRLEnv,values: torch.Tensor) -> torch.Tensor:
+#     # print("restitution values ", values.shape)
+#     # print(values)
+#     # breakpoint()
+#     return values
+
+# def hip_scale_values(env: ManagerBasedRLEnv,values: torch.Tensor) -> torch.Tensor:
+#     # print("hip scale values ", values.shape)
+#     # print(values)
+#     # breakpoint()
+#     return values
+
+# def calf_scale_values(env: ManagerBasedRLEnv,values: torch.Tensor) -> torch.Tensor:
+#     # print("restitution values ", values.shape)
+#     # print(values)
+#     # breakpoint()
+#     return values
+
+# def motor_strength(env: ManagerBasedRLEnv,values: torch.Tensor) -> torch.Tensor:
+#     # print("hip scale values ", values.shape)
+#     # print(values)
+#     # breakpoint()
+#     return values
+
+
+
+# History
+# def base_lin_vel_history(env: ManagerBasedEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+#     """Root linear velocity in the asset's root frame."""
+#     # extract the used quantities (to enable type-hinting)
+#     asset: RigidObject = env.scene[asset_cfg.name]
+#     return asset.base_lin_vel_history #cpu
+
+# def base_ang_vel_history(env: ManagerBasedEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+#     """Root angular velocity in the asset's root frame."""
+#     # extract the used quantities (to enable type-hinting)
+#     asset: RigidObject = env.scene[asset_cfg.name]
+#     return asset.base_ang_vel_history #cpu
+
+# def command_history(env: ManagerBasedRLEnv, command_name: str) -> torch.Tensor:
+#     """The generated command from command term in the command manager with the given name."""
+#     return env.command_manager.get_command_history(command_name)
+    
+# def joint_pos_history(env: ManagerBasedEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+#     # extract the used quantities (to enable type-hinting)
+#     asset: Articulation = env.scene[asset_cfg.name]
+#     return asset.joint_pos_history
+    
+# def joint_vel_history(env: ManagerBasedEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+#     # extract the used quantities (to enable type-hinting)
+#     asset: Articulation = env.scene[asset_cfg.name]
+#     return asset.joint_vel_history
+
+# def joint_pos_error_history(env: ManagerBasedEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+#     # extract the used quantities (to enable type-hinting)
+#     asset: Articulation = env.scene[asset_cfg.name]
+#     return asset.joint_pos_error_history
+    
+# def joint_vel_error_history(env: ManagerBasedEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+#     # extract the used quantities (to enable type-hinting)
+#     asset: Articulation = env.scene[asset_cfg.name]
+#     return asset.joint_vel_error_history
+
+# # def joint_pos_rel_history(env: ManagerBasedEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+# #     # extract the used quantities (to enable type-hinting)
+# #     asset: Articulation = env.scene[asset_cfg.name]
+# #     return asset.joint_pos_rel_history
+    
+
+# # def joint_vel_rel_history(env: ManagerBasedEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+# #     # extract the used quantities (to enable type-hinting)
+# #     asset: Articulation = env.scene[asset_cfg.name]
+# #     return asset.joint_vel_rel_history
+
+# def action_history(env: ManagerBasedEnv) -> torch.Tensor:
+#     return env.action_manager.action_history
+
+# def last_two_action_history(env: ManagerBasedEnv) -> torch.Tensor:
+#     action_history = env.action_manager.action_history
+#     # print("action_history ", action_history.shape) #torch.Size([2048, 180])
+#     # breakpoint()
+#     # last_two_actions = action_history[: 0,1]
+#     # print("last_two_actions ", last_two_actions)
+#     # print("last_two_actions ", last_two_actions.shape)
+#     # breakpoint()
+#     # return last_two_actions
+#     return action_history
+
+# def projected_gravity_history(env: ManagerBasedEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+#     """Gravity projection on the asset's root frame."""
+#     # extract the used quantities (to enable type-hinting)
+#     asset: RigidObject = env.scene[asset_cfg.name]
+#     return asset.projected_gravity_history
+
+
+
+# def base_lin_vel_history(env: ManagerBasedEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+#     """Root linear velocity in the asset's root frame."""
+#     # extract the used quantities (to enable type-hinting)
+#     asset: RigidObject = env.scene[asset_cfg.name]
+#     base_lin_vel_history = asset.base_lin_vel_history #cpu
+#     return base_lin_vel_history
+
+# def base_ang_vel_history(env: ManagerBasedEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+#     """Root angular velocity in the asset's root frame."""
+#     # extract the used quantities (to enable type-hinting)
+#     asset: RigidObject = env.scene[asset_cfg.name]
+#     base_ang_vel_history = asset.base_ang_vel_history #cpu
+#     return base_ang_vel_history
+
+# def command_history(env: ManagerBasedRLEnv, command_name: str) -> torch.Tensor:
+#     """The generated command from command term in the command manager with the given name."""
+#     command_history = env.command_manager.get_command_history(command_name)
+#     # print(command_history.device)
+#     # breakpoint()
+#     return command_history
+
+# def joint_pos_rel_history(env: ManagerBasedEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+#     # extract the used quantities (to enable type-hinting)
+#     asset: Articulation = env.scene[asset_cfg.name]
+#     joint_pos_rel_history = asset.joint_pos_rel_history
+#     #print("joint_pos_rel_history in observation.py", joint_pos_rel_history)
+#     return joint_pos_rel_history
+
+# def joint_vel_rel_history(env: ManagerBasedEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+#     # extract the used quantities (to enable type-hinting)
+#     asset: Articulation = env.scene[asset_cfg.name]
+#     joint_vel_rel_history = asset.joint_vel_rel_history
+#     #print("joint_vel_rel_history in observation.py", joint_vel_rel_history)
+#     return joint_vel_rel_history
+
+# def action_history(env: ManagerBasedEnv) -> torch.Tensor:
+#     return env.action_manager.action_history
+
+# def projected_gravity_history(env: ManagerBasedEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+#     """Gravity projection on the asset's root frame."""
+#     # extract the used quantities (to enable type-hinting)
+#     asset: RigidObject = env.scene[asset_cfg.name]
+#     projected_gravity_history = asset.projected_gravity_history
+#     return projected_gravity_history

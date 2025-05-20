@@ -112,7 +112,7 @@ class CommandsCfg:
         heading_control_stiffness=0.5,
         debug_vis=True,
         ranges=mdp.UniformVelocityCommandCfg.Ranges(
-            lin_vel_x=(-1.0, 1.0), lin_vel_y=(-1.0, 1.0), ang_vel_z=(-1.0, 1.0), heading=(-math.pi, math.pi)
+            lin_vel_x=(-1.0, 1.0), lin_vel_y=(-0.5, 0.5), ang_vel_z=(-1.0, 1.0), heading=(-math.pi, math.pi)
         ),
     )
 
@@ -121,7 +121,12 @@ class CommandsCfg:
 class ActionsCfg:
     """Action specifications for the MDP."""
 
-    joint_pos = mdp.JointPositionActionCfg(asset_name="robot", joint_names=[".*"], scale=0.5, use_default_offset=True)
+    joint_pos = mdp.JointPositionActionCfg(
+        asset_name="robot", 
+        joint_names=[".*"], 
+        scale=0.5, 
+        use_default_offset=True
+    )
 
 
 @configclass
@@ -154,8 +159,45 @@ class ObservationsCfg:
             self.enable_corruption = True
             self.concatenate_terms = True
 
+    @configclass
+    class CriticCfg(ObsGroup):
+        """Observations for critic group."""
+
+        #--rapid
+        joint_abs_pos = ObsTerm(func=mdp.joint_pos) #non rel
+        joint_abs_vel = ObsTerm(func=mdp.joint_vel) #non rel
+        projected_gravity = ObsTerm(
+            func=mdp.projected_gravity, 
+        )
+        actions = ObsTerm(func=mdp.last_action)
+        velocity_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "base_velocity"})
+       
+        #addtition
+        base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
+        base_ang_vel = ObsTerm(func=mdp.base_ang_vel) 
+        feet_height = ObsTerm(
+            func=mdp.feet_height,
+            params={"sensor_cfg": SceneEntityCfg("feet_position"),},
+        )
+        feet_contact = ObsTerm( 
+            func=mdp.contact_forces,
+            params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=[".*foot"]), "threshold": 1.0},
+        )
+        height_scan = ObsTerm(
+            func=mdp.height_scan,
+            params={"sensor_cfg": SceneEntityCfg("height_scanner")},
+            #noise=Unoise(n_min=-0.1, n_max=0.1),
+            #noise=Unoise(n_min=-0.5, n_max=0.5), #model_height_noise_0.5 #result: reward went down
+            clip=(-1.0, 1.0),
+        )
+
+        def __post_init__(self):
+            self.enable_corruption = False
+            self.concatenate_terms = True
+
     # observation groups
     policy: PolicyCfg = PolicyCfg()
+    critic: CriticCfg = CriticCfg()
 
 
 @configclass
@@ -171,8 +213,8 @@ class EventCfg:
             # "static_friction_range": (0.8, 0.8),
             # "dynamic_friction_range": (0.6, 0.6),
             "static_friction_range": (0.6, 1.2),
-            "dynamic_friction_range": (0.6, 1.2),
-            "restitution_range": (0.0, 0.0),
+            "dynamic_friction_range": (0.4, 1.0),
+            "restitution_range": (0.0, 1.0),
             "num_buckets": 64,
         },
     )
