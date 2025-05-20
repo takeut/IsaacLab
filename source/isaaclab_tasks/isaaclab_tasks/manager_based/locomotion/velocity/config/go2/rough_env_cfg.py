@@ -52,11 +52,11 @@ class UnitreeGo2RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
             },
         }
 
-        # rewards for feet - feet_clearanceはエラーの原因となるため無効化
+        # rewards for feet - 足を上げるための報酬を調整
         self.rewards.feet_air_time.params["sensor_cfg"].body_names = ".*_foot"
-        self.rewards.feet_air_time.weight = 0.0  # 無効化
-        self.rewards.feet_clearance.weight = 0.0  # 無効化（エラーの原因となるため）
-        self.rewards.feet_clearance.params["threshold"] = 0.12
+        self.rewards.feet_air_time.weight = 0.005  # 少し有効化して足が空中にある時間を増やす
+        self.rewards.feet_clearance.weight = 0.005  # 少し有効化して足のクリアランスを増やす
+        self.rewards.feet_clearance.params["threshold"] = 0.15  # しきい値を上げて足をより高く上げるよう促す
 
         # self.rewards.undesired_contacts = None
 

@@ -193,8 +193,8 @@ class EventCfg:
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=".*_joint"),
-            "stiffness_distribution_params": (18.0, 28.0),  # Kp（P制御のゲイン）
-            "damping_distribution_params": (0.1, 0.8),      # Kd（D制御のゲイン）
+            "stiffness_distribution_params": (15.0, 28.0),  # より広い範囲でKp（P制御のゲイン）をランダム化
+            "damping_distribution_params": (0.07, 1.0),     # より広い範囲でKd（D制御のゲイン）をランダム化
             "operation": "abs",                          
             "distribution": "uniform",               
         },
