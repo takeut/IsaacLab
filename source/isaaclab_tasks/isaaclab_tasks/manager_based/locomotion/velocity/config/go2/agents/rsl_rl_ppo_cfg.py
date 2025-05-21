@@ -57,7 +57,7 @@ class UnitreeGo2FlatPPORunnerCfg(UnitreeGo2RoughPPORunnerCfg):
         self.algorithm.max_grad_norm = 0.8  # 勾配のノルム制限を強化
         self.algorithm.clip_param = 0.1  # クリッピングパラメータを小さくして更新を安定化
         self.algorithm.desired_kl = 0.007  # KLダイバージェンスの目標値を小さくする
-        self.algorithm.entropy_coef = 0.01  # エントロピー係数を増やして探索を促進
+        # self.algorithm.entropy_coef = 0.01  # エントロピー係数を増やして探索を促進
         self.empirical_normalization = True  # 経験的正規化を有効にして入力の分布を安定化
         
         # #normal
