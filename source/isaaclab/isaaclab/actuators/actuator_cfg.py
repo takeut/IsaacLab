@@ -203,7 +203,7 @@ class DelayedDCMotorCfg(DCMotorCfg):
     """takeut write: 
         実機では通信遅延を考慮して、より長いバッファ長が必要かもしれない
         シミュレータ: 0-1程度
-        実機推奨: dt 5ms なので 10 で 10ms
+        実機推奨: dt 5ms なので 10 で 50ms
     """
 
 

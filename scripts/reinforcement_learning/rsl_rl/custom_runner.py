@@ -35,9 +35,9 @@ class CustomOnPolicyRunner(OnPolicyRunner):
         # Counter for recovery attempts
         self.recovery_attempts = 0
         # Maximum number of recovery attempts
-        self.max_recovery_attempts = 3
+        self.max_recovery_attempts = 10
         # Learning rate reduction factor on recovery
-        self.lr_reduction_factor = 0.5
+        self.lr_reduction_factor = 0.1
 
     def save(self, path, infos=None):
         """Save the current state of the runner.
