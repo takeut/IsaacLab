@@ -38,6 +38,12 @@ class CustomOnPolicyRunner(OnPolicyRunner):
         self.max_recovery_attempts = 10
         # Learning rate reduction factor on recovery
         self.lr_reduction_factor = 0.1
+        # Make sure logger_type is initialized
+        if not hasattr(self, 'logger_type'):
+            self.logger_type = cfg.get('logger', 'tensorboard')
+        # Make sure disable_logs is initialized
+        if not hasattr(self, 'disable_logs'):
+            self.disable_logs = False
 
     def save(self, path, infos=None):
         """Save the current state of the runner.
