@@ -38,12 +38,6 @@ class CustomOnPolicyRunner(OnPolicyRunner):
         self.max_recovery_attempts = 10
         # Learning rate reduction factor on recovery
         self.lr_reduction_factor = 0.1
-        # Make sure logger_type is initialized
-        if not hasattr(self, 'logger_type'):
-            self.logger_type = cfg.get('logger', 'tensorboard')
-        # Make sure disable_logs is initialized
-        if not hasattr(self, 'disable_logs'):
-            self.disable_logs = False
 
     def save(self, path, infos=None):
         """Save the current state of the runner.
@@ -60,11 +54,8 @@ class CustomOnPolicyRunner(OnPolicyRunner):
         if len(self.checkpoint_history) > self.max_checkpoint_history:
             self.checkpoint_history.pop(0)
 
-    def get_recovery_checkpoint(self, iterations_back=100):
+    def get_recovery_checkpoint(self):
         """Get a checkpoint path from history for recovery.
-        
-        Args:
-            iterations_back: Number of iterations to go back for recovery.
             
         Returns:
             Path to the checkpoint for recovery, or None if no suitable checkpoint is found.
@@ -106,9 +97,9 @@ class CustomOnPolicyRunner(OnPolicyRunner):
         current_iteration = self.current_learning_iteration
         while current_iteration < num_learning_iterations:
             try:
-                # Collect rollout
+                # Collect rollout using parent class method
                 start = time.time()
-                self.collect_rollout()
+                super().collect_rollout()
                 end = time.time()
                 collection_time = end - start
                 
@@ -126,8 +117,8 @@ class CustomOnPolicyRunner(OnPolicyRunner):
                 end = time.time()
                 update_time = end - start
                 
-                # Log data
-                self.log(collection_time, update_time)
+                # Log data using parent class method
+                super().log(collection_time, update_time)
                 
                 # Save checkpoint periodically
                 if self.current_learning_iteration % self.save_interval == 0:
