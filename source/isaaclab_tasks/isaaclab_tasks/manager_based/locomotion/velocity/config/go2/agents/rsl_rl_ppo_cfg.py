@@ -12,7 +12,7 @@ from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlPpoActorCriticCfg, R
 class UnitreeGo2RoughPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
     max_iterations = 1000000
-    save_interval = 10000
+    save_interval = 50
     experiment_name = "unitree_go2_rough"
     empirical_normalization = False
     policy = RslRlPpoActorCriticCfg(
