@@ -36,7 +36,7 @@ class UnitreeGo2RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
 
         # event
         # self.events.push_robot = None  # コメントアウト（velocity_env_cfgでpush_robotがコメントアウトされているため）
-        # self.events.add_base_mass.params["mass_distribution_params"] = (-1.0, 3.0)
+        self.events.add_base_mass.params["mass_distribution_params"] = (-1.0, 3.0)
         self.events.add_base_mass.params["asset_cfg"].body_names = "base"
         self.events.base_external_force_torque.params["asset_cfg"].body_names = "base"
         self.events.reset_robot_joints.params["position_range"] = (1.0, 1.0)
@@ -61,7 +61,7 @@ class UnitreeGo2RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         # self.rewards.undesired_contacts = None
 
         # reward for move
-        # self.rewards.dof_torques_l2.weight = -0.0002  # 関節トルクの使用に対するペナルティを強化
+        self.rewards.dof_torques_l2.weight = -0.0002  # 関節トルクの使用に対するペナルティを強化
         self.rewards.track_lin_vel_xy_exp.weight = 1.5  # 線形速度の追跡報酬を強化（前後左右の歩行性能向上）
         self.rewards.track_ang_vel_z_exp.weight = 0.75  # 角速度の追跡報酬を強化（回転性能向上）
         self.rewards.dof_acc_l2.weight = -2.8e-7  # より滑らかな加速を可能に, 急激な動作変化を抑制しつつ、必要な動作は許容
@@ -71,18 +71,18 @@ class UnitreeGo2RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
 
         # reward for stability
         self.rewards.base_height_l2.weight = -60.0
-        self.rewards.flat_orientation_l2.weight = -0.5  # 平らな姿勢を維持するためのペナルティを強化
-        # self.rewards.ang_vel_xy_l2.weight = -0.05  # XY平面での角速度に対するペナルティを強化
+        self.rewards.flat_orientation_l2.weight = -1.0  # 平らな姿勢を維持するためのペナルティを強化
+        self.rewards.ang_vel_xy_l2.weight = -0.05  # XY平面での角速度に対するペナルティを強化
 
-        # self.rewards.joint_pos_limits.weight = -10.0  # 関節位置の制限に対するペナルティを強化
-        # self.commands.base_velocity.ranges.lin_vel_x = (-1.0, 1.0)
-        # self.commands.base_velocity.ranges.lin_vel_y = (-1.0, 1.0)
-        # self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
-        # self.commands.base_velocity.rel_standing_envs = 0.07
+        self.rewards.joint_pos_limits.weight = -10.0  # 関節位置の制限に対するペナルティを強化
+        self.commands.base_velocity.ranges.lin_vel_x = (-1.0, 1.0)
+        self.commands.base_velocity.ranges.lin_vel_y = (-1.0, 1.0)
+        self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
+        self.commands.base_velocity.rel_standing_envs = 0.07
 
-        # self.events.add_base_mass.params["mass_distribution_params"] = (-1.0, 3.0)
-        # self.events.physics_material.static_friction_range = (0.6, 1.0)
-        # self.events.physics_material.dynamic_friction_range = (0.6, 1.25)
+        self.events.add_base_mass.params["mass_distribution_params"] = (-1.0, 3.0)
+        self.events.physics_material.static_friction_range = (0.6, 1.0)
+        self.events.physics_material.dynamic_friction_range = (0.6, 1.25)
 
         self.actions.joint_pos.scale= 0.45
 
@@ -109,3 +109,8 @@ class UnitreeGo2RoughEnvCfg_PLAY(UnitreeGo2RoughEnvCfg):
         self.events.base_external_force_torque = None
         # self.events.push_robot = None  # コメントアウト（velocity_env_cfgでpush_robotがコメントアウトされているため）
 
+        #add by kobayashi 
+        # if hasattr(self.observations.policy, "height_scan"):
+        #     del self.observations.policy.height_scan
+        # if hasattr(self.observations.policy, "base_lin_vel"):
+        #     del self.observations.policy.base_lin_vel
