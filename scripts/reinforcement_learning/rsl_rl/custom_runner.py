@@ -25,9 +25,9 @@ class CustomOnPolicyRunner(OnPolicyRunner):
     with a reduced learning rate.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, env, cfg, log_dir, device="cpu"):
         """Initialize the custom runner."""
-        super().__init__(*args, **kwargs)
+        super().__init__(env, cfg, log_dir, device)
         # Keep track of checkpoints for recovery
         self.checkpoint_history = []
         # Maximum number of checkpoints to keep in history
@@ -38,6 +38,12 @@ class CustomOnPolicyRunner(OnPolicyRunner):
         self.max_recovery_attempts = 10
         # Learning rate reduction factor on recovery
         self.lr_reduction_factor = 0.1
+        # Make sure logger_type is initialized
+        if not hasattr(self, 'logger_type'):
+            self.logger_type = cfg.get('logger', 'tensorboard')
+        # Make sure disable_logs is initialized
+        if not hasattr(self, 'disable_logs'):
+            self.disable_logs = False
 
     def save(self, path, infos=None):
         """Save the current state of the runner.
