@@ -47,8 +47,8 @@ class UnitreeGo2FlatPPORunnerCfg(UnitreeGo2RoughPPORunnerCfg):
 
         self.max_iterations = 100000
         self.experiment_name = "unitree_go2_flat"
-        # self.policy.actor_hidden_dims = [128, 128, 128]
-        # self.policy.critic_hidden_dims = [128, 128, 128]
+        self.policy.actor_hidden_dims = [128, 128, 128]
+        self.policy.critic_hidden_dims = [128, 128, 128]
 
         # さらに安定した学習のための設定
         self.policy.init_noise_std = 0.8  # 探索ノイズを少し減らす

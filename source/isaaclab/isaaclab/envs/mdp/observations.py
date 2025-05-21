@@ -605,27 +605,27 @@ Customs.
 
 """
 
-def contact(env: ManagerBasedRLEnv, threshold: float, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
-    # extract the used quantities (to enable type-hinting)
-    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
-    # check if contact force is above threshold
-    net_contact_forces = contact_sensor.data.net_forces_w_history
-    is_contact = torch.max(torch.norm(net_contact_forces[:, :, sensor_cfg.body_ids], dim=-1), dim=1)[0] > threshold
-    is_contact = is_contact.int() #1 or 0
-    #print("is_contact feet ", is_contact) #True or False
-    # foot_net_contact_forces_history_latest = torch.max(torch.norm(net_contact_forces[:, :, sensor_cfg.body_ids], dim=-1), dim=1)[0]
-    return is_contact
+# def contact(env: ManagerBasedRLEnv, threshold: float, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
+#     # extract the used quantities (to enable type-hinting)
+#     contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+#     # check if contact force is above threshold
+#     net_contact_forces = contact_sensor.data.net_forces_w_history
+#     is_contact = torch.max(torch.norm(net_contact_forces[:, :, sensor_cfg.body_ids], dim=-1), dim=1)[0] > threshold
+#     is_contact = is_contact.int() #1 or 0
+#     #print("is_contact feet ", is_contact) #True or False
+#     # foot_net_contact_forces_history_latest = torch.max(torch.norm(net_contact_forces[:, :, sensor_cfg.body_ids], dim=-1), dim=1)[0]
+#     return is_contact
 
 
-def feet_height(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
-    frame_transformer: FrameTransformer = env.scene.sensors[sensor_cfg.name]
-    feet_height = frame_transformer.data.target_pos_w[:, :, 2]
-    return feet_height
+# def feet_height(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
+#     frame_transformer: FrameTransformer = env.scene.sensors[sensor_cfg.name]
+#     feet_height = frame_transformer.data.target_pos_w[:, :, 2]
+#     return feet_height
 
-def feet_position(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
-    frame_transformer: FrameTransformer = env.scene.sensors[sensor_cfg.name]
-    feet_position = frame_transformer.data.target_pos_w[:, :, :]
-    return feet_position.view(env.num_envs, -1)
+# def feet_position(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
+#     frame_transformer: FrameTransformer = env.scene.sensors[sensor_cfg.name]
+#     feet_position = frame_transformer.data.target_pos_w[:, :, :]
+#     return feet_position.view(env.num_envs, -1)
 
 
 
