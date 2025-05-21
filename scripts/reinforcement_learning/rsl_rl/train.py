@@ -74,8 +74,6 @@ import os
 import torch
 from datetime import datetime
 
-# Import custom runner
-from custom_runner import CustomOnPolicyRunner
 from rsl_rl.runners import OnPolicyRunner
 
 from isaaclab.envs import (
@@ -165,8 +163,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     # wrap around environment for rsl-rl
     env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
 
-    # create custom runner with error handling for value function explosion
-    runner = CustomOnPolicyRunner(env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device)
+    # create runner from rsl-rl
+    runner = OnPolicyRunner(env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device)
     # write git state to logs
     runner.add_git_repo_to_log(__file__)
     # load the checkpoint
