@@ -72,13 +72,9 @@ if args_cli.distributed and version.parse(installed_version) < version.parse(RSL
 import gymnasium as gym
 import os
 import torch
-import math
-import time
-import glob
 from datetime import datetime
 
 from rsl_rl.runners import OnPolicyRunner
-from rsl_rl.algorithms import PPO
 
 from isaaclab.envs import (
     DirectMARLEnv,
@@ -183,174 +179,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     dump_pickle(os.path.join(log_dir, "params", "env.pkl"), env_cfg)
     dump_pickle(os.path.join(log_dir, "params", "agent.pkl"), agent_cfg)
 
-    # チェックポイントの履歴を保存する変数
-    checkpoint_history = []
-    # 最大チェックポイント履歴数
-    max_checkpoint_history = 10
-    # 回復試行回数
-    recovery_attempts = 0
-    # 最大回復試行回数
-    max_recovery_attempts = 10
-    # 学習率削減係数
-    lr_reduction_factor = 0.1
-    
-    # logger_type属性を追加
-    if not hasattr(runner, 'logger_type'):
-        runner.logger_type = agent_cfg.logger
-    
-    # disable_logs属性を追加
-    if not hasattr(runner, 'disable_logs'):
-        runner.disable_logs = False
-    
-    # オリジナルのsaveメソッドを保存
-    original_save = runner.save
-    
-    # saveメソッドをオーバーライド
-    def custom_save(path, infos=None):
-        # チェックポイントを保存
-        try:
-            # オリジナルのsaveメソッドを呼び出す
-            original_save(path, infos)
-        except Exception as e:
-            print(f"[WARNING] Error saving checkpoint: {str(e)}")
-            # 代替の保存方法
-            checkpoint = {
-                "model_state_dict": runner.alg.actor_critic.state_dict(),
-                "optimizer_state_dict": runner.alg.optimizer.state_dict(),
-                "iter": runner.current_learning_iteration,
-                "infos": infos
-            }
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            torch.save(checkpoint, path)
-            print(f"[INFO] Checkpoint saved using alternative method: {path}")
-        
-        # チェックポイントの履歴に追加
-        checkpoint_history.append(path)
-        
-        # 履歴が最大数を超えた場合、古いものから削除
-        if len(checkpoint_history) > max_checkpoint_history:
-            checkpoint_history.pop(0)
-    
-    # saveメソッドを置き換え
-    runner.save = custom_save
-    
-    # オリジナルのupdateメソッドを保存
-    original_update = runner.alg.update
-    
-    # updateメソッドをオーバーライド
-    def custom_update(storage):
-        nonlocal recovery_attempts
-        
-        try:
-            # オリジナルのupdateメソッドを呼び出す
-            mean_value_loss = original_update(storage)
-            
-            # 値関数の損失が1000を超えた場合
-            if mean_value_loss > 1000 or math.isinf(mean_value_loss) or math.isnan(mean_value_loss):
-                raise ValueError(f"Value function loss is {mean_value_loss}")
-            
-            return mean_value_loss
-        except ValueError as e:
-            if "Value function loss" in str(e) and recovery_attempts < max_recovery_attempts:
-                recovery_attempts += 1
-                print(f"[WARNING] {str(e)}. Attempting recovery ({recovery_attempts}/{max_recovery_attempts})...")
-                
-                # チェックポイントの履歴から100回前のチェックポイントを取得
-                if len(checkpoint_history) > 0:
-                    # 利用可能な最も古いチェックポイントを取得
-                    recovery_path = checkpoint_history[0]
-                    print(f"[INFO] Loading checkpoint from {recovery_path}")
-                    
-                    # チェックポイントを読み込む
-                    runner.load(recovery_path)
-                    
-                    # 学習率を0.1倍に減らす
-                    if isinstance(runner.alg, PPO):
-                        current_lr = runner.alg.learning_rate
-                        new_lr = current_lr * lr_reduction_factor
-                        print(f"[INFO] Reducing learning rate from {current_lr} to {new_lr}")
-                        runner.alg.learning_rate = new_lr
-                        
-                        # オプティマイザーの学習率も更新
-                        for param_group in runner.alg.optimizer.param_groups:
-                            param_group['lr'] = new_lr
-                    
-                    print("[INFO] Resuming training...")
-                    
-                    # ダミーの値を返す
-                    return 0.0
-                else:
-                    print("[ERROR] No checkpoint available for recovery. Exiting...")
-                    raise e
-            else:
-                print(f"[ERROR] Fatal error or maximum recovery attempts reached: {str(e)}")
-                raise e
-    
-    # updateメソッドを置き換え
-    runner.alg.update = custom_update
-    
-    # 初期チェックポイントを保存
-    runner.save(os.path.join(log_dir, f"model_{runner.current_learning_iteration}.pt"))
-    
     # run training
-    current_iteration = runner.current_learning_iteration
-    max_iterations = agent_cfg.max_iterations
-    
-    while current_iteration < max_iterations:
-        try:
-            # 一定回数の学習を実行
-            next_save_iteration = current_iteration + agent_cfg.save_interval
-            next_target = min(next_save_iteration, max_iterations)
-            
-            print(f"[INFO] Training from iteration {current_iteration} to {next_target}")
-            runner.learn(num_learning_iterations=next_target, init_at_random_ep_len=(current_iteration == 0))
-            
-            # 現在の反復回数を更新
-            current_iteration = runner.current_learning_iteration
-            
-        except Exception as e:
-            print(f"[WARNING] Training error at iteration {current_iteration}: {str(e)}")
-            
-            # 最終チェックポイントを保存
-            error_path = os.path.join(log_dir, f"model_error_{current_iteration}.pt")
-            runner.save(error_path)
-            
-            # 回復処理
-            if recovery_attempts < max_recovery_attempts:
-                recovery_attempts += 1
-                print(f"[INFO] Attempting recovery ({recovery_attempts}/{max_recovery_attempts})...")
-                
-                # チェックポイントの履歴から最も古いチェックポイントを取得
-                if len(checkpoint_history) > 0:
-                    recovery_path = checkpoint_history[0]
-                    print(f"[INFO] Loading checkpoint from {recovery_path}")
-                    
-                    # チェックポイントを読み込む
-                    runner.load(recovery_path)
-                    current_iteration = runner.current_learning_iteration
-                    
-                    # 学習率を0.1倍に減らす
-                    if isinstance(runner.alg, PPO):
-                        current_lr = runner.alg.learning_rate
-                        new_lr = current_lr * lr_reduction_factor
-                        print(f"[INFO] Reducing learning rate from {current_lr} to {new_lr}")
-                        runner.alg.learning_rate = new_lr
-                        
-                        # オプティマイザーの学習率も更新
-                        for param_group in runner.alg.optimizer.param_groups:
-                            param_group['lr'] = new_lr
-                    
-                    print(f"[INFO] Resuming training from iteration {current_iteration}")
-                    continue
-                else:
-                    print("[ERROR] No checkpoint available for recovery. Exiting...")
-                    break
-            else:
-                print(f"[ERROR] Maximum recovery attempts ({max_recovery_attempts}) reached. Exiting...")
-                break
-    
-    # 最終チェックポイントを保存
-    runner.save(os.path.join(log_dir, f"model_final_{runner.current_learning_iteration}.pt"))
+    runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True)
 
     # close the simulator
     env.close()
