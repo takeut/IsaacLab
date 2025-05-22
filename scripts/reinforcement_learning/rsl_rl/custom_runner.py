@@ -31,8 +31,8 @@ class CustomOnPolicyRunner(OnPolicyRunner):
         super().__init__(env, train_cfg, log_dir, device)
         
         # 追加の設定
-        self.value_loss_threshold = 1000.0  # value_function lossのしきい値
-        self.checkpoint_history = deque(maxlen=100)  # 最新100個のチェックポイントを保存
+        self.value_loss_threshold = 500.0  # value_function lossのしきい値
+        self.checkpoint_history = deque(maxlen=3)  # 最新150(3x50)個のチェックポイントを保存
         self.original_learning_rate = self.alg.learning_rate  # 元の学習率を保存
 
     def learn(self, num_learning_iterations: int, init_at_random_ep_len: bool = False):
@@ -194,10 +194,27 @@ class CustomOnPolicyRunner(OnPolicyRunner):
                         print(f"Reducing learning rate from {self.alg.learning_rate:.6f} to {new_learning_rate:.6f}")
                         self.alg.learning_rate = new_learning_rate
                         
-                        # 観測を再取得
-                        obs, extras = self.env.get_observations()
-                        privileged_obs = extras["observations"].get(self.privileged_obs_type, obs)
-                        obs, privileged_obs = obs.to(self.device), privileged_obs.to(self.device)
+                        # 環境をリセットして観測を再取得
+                        try:
+                            print("Resetting environment after loading checkpoint...")
+                            # 環境をリセットする前に一時停止を入れる（リソースの解放のため）
+                            time.sleep(1.0)
+                            
+                            # 環境をリセット
+                            obs, extras = self.env.reset()
+                            privileged_obs = extras["observations"].get(self.privileged_obs_type, obs)
+                            obs, privileged_obs = obs.to(self.device), privileged_obs.to(self.device)
+                            
+                            # エピソード長バッファをリセット
+                            self.env.episode_length_buf = torch.zeros_like(self.env.episode_length_buf)
+                            
+                            print("Environment successfully reset")
+                        except Exception as e:
+                            print(f"Error resetting environment: {e}")
+                            print("Trying to get observations without reset...")
+                            obs, extras = self.env.get_observations()
+                            privileged_obs = extras["observations"].get(self.privileged_obs_type, obs)
+                            obs, privileged_obs = obs.to(self.device), privileged_obs.to(self.device)
                         
                         # 現在のイテレーションを更新
                         self.current_learning_iteration = oldest_it
