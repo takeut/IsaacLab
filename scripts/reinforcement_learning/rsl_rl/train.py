@@ -194,13 +194,35 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     # 学習率削減係数
     lr_reduction_factor = 0.1
     
+    # logger_type属性を追加
+    if not hasattr(runner, 'logger_type'):
+        runner.logger_type = agent_cfg.logger
+    
+    # disable_logs属性を追加
+    if not hasattr(runner, 'disable_logs'):
+        runner.disable_logs = False
+    
     # オリジナルのsaveメソッドを保存
     original_save = runner.save
     
     # saveメソッドをオーバーライド
     def custom_save(path, infos=None):
-        # オリジナルのsaveメソッドを呼び出す
-        original_save(path, infos)
+        # チェックポイントを保存
+        try:
+            # オリジナルのsaveメソッドを呼び出す
+            original_save(path, infos)
+        except Exception as e:
+            print(f"[WARNING] Error saving checkpoint: {str(e)}")
+            # 代替の保存方法
+            checkpoint = {
+                "model_state_dict": runner.alg.actor_critic.state_dict(),
+                "optimizer_state_dict": runner.alg.optimizer.state_dict(),
+                "iter": runner.current_learning_iteration,
+                "infos": infos
+            }
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            torch.save(checkpoint, path)
+            print(f"[INFO] Checkpoint saved using alternative method: {path}")
         
         # チェックポイントの履歴に追加
         checkpoint_history.append(path)
