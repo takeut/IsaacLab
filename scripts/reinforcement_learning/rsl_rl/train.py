@@ -184,11 +184,41 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True)
 
     # close the simulator
-    env.close()
+    print("Cleaning up environment resources...")
+    try:
+        # ガベージコレクションを実行
+        import gc
+        gc.collect()
+        
+        # PyTorchのCUDAキャッシュをクリア
+        if hasattr(torch, 'cuda'):
+            torch.cuda.empty_cache()
+            
+        # 環境を閉じる
+        env.close()
+        print("Environment resources cleaned up successfully")
+    except Exception as e:
+        print(f"Warning: Error during environment cleanup: {e}")
+        # エラーが発生しても環境を閉じる試行
+        try:
+            env.close()
+        except:
+            pass
 
 
 if __name__ == "__main__":
-    # run the main function
-    main()
-    # close sim app
-    simulation_app.close()
+    try:
+        # run the main function
+        main()
+    finally:
+        # 最終的なクリーンアップ
+        print("Performing final cleanup...")
+        import gc
+        gc.collect()
+        if hasattr(torch, 'cuda'):
+            torch.cuda.empty_cache()
+        
+        # close sim app
+        print("Closing simulation app...")
+        simulation_app.close()
+        print("Simulation app closed")
