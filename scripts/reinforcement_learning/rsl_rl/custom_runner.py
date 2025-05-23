@@ -34,6 +34,84 @@ class CustomOnPolicyRunner(OnPolicyRunner):
         self.value_loss_threshold = 500.0  # value_function lossのしきい値
         self.checkpoint_history = deque(maxlen=3)  # 最新150(3x50)個のチェックポイントを保存
         self.original_learning_rate = self.alg.learning_rate  # 元の学習率を保存
+        
+    def load(self, path: str, load_optimizer: bool = True):
+        """チェックポイントからモデルをロードする（PyTorch推論モードの問題に対応）
+
+        Args:
+            path: チェックポイントのパス
+            load_optimizer: オプティマイザーをロードするかどうか
+
+        Returns:
+            ロードされたチェックポイントの追加情報
+        """
+        print(f"Loading checkpoint from: {path} with safe tensor handling")
+        loaded_dict = torch.load(path, weights_only=False)
+        
+        # モデルの状態をロード
+        resumed_training = self.alg.policy.load_state_dict(loaded_dict["model_state_dict"])
+        
+        # RNDモデルがある場合はロード
+        if self.alg.rnd:
+            self.alg.rnd.load_state_dict(loaded_dict["rnd_state_dict"])
+            
+        # 経験的正規化を使用している場合
+        if self.empirical_normalization:
+            if resumed_training:
+                # 安全にテンソルをロード（クローンを作成してからロード）
+                try:
+                    # 観測の正規化器の状態をロード
+                    obs_norm_state = loaded_dict["obs_norm_state_dict"]
+                    safe_obs_norm_state = {}
+                    for key, value in obs_norm_state.items():
+                        if isinstance(value, torch.Tensor):
+                            safe_obs_norm_state[key] = value.clone().detach()
+                        else:
+                            safe_obs_norm_state[key] = value
+                    self.obs_normalizer.load_state_dict(safe_obs_norm_state)
+                    
+                    # 特権観測の正規化器の状態をロード
+                    priv_obs_norm_state = loaded_dict["privileged_obs_norm_state_dict"]
+                    safe_priv_obs_norm_state = {}
+                    for key, value in priv_obs_norm_state.items():
+                        if isinstance(value, torch.Tensor):
+                            safe_priv_obs_norm_state[key] = value.clone().detach()
+                        else:
+                            safe_priv_obs_norm_state[key] = value
+                    self.privileged_obs_normalizer.load_state_dict(safe_priv_obs_norm_state)
+                    
+                    print("Successfully loaded normalizer states with safe tensor handling")
+                except Exception as e:
+                    print(f"Warning: Failed to load normalizer states: {e}")
+                    print("Continuing with default normalizer states")
+            else:
+                # トレーニングが再開されない場合（蒸留トレーニングの場合など）
+                try:
+                    self.privileged_obs_normalizer.load_state_dict(loaded_dict["obs_norm_state_dict"])
+                    print("Loaded teacher normalizer state for distillation")
+                except Exception as e:
+                    print(f"Warning: Failed to load teacher normalizer state: {e}")
+                    
+        # オプティマイザーをロード
+        if load_optimizer and resumed_training:
+            try:
+                # アルゴリズムのオプティマイザー
+                self.alg.optimizer.load_state_dict(loaded_dict["optimizer_state_dict"])
+                
+                # RNDオプティマイザーがある場合
+                if self.alg.rnd:
+                    self.alg.rnd_optimizer.load_state_dict(loaded_dict["rnd_optimizer_state_dict"])
+                    
+                print("Successfully loaded optimizer states")
+            except Exception as e:
+                print(f"Warning: Failed to load optimizer states: {e}")
+                print("Continuing with default optimizer states")
+                
+        # 現在の学習イテレーションをロード
+        if resumed_training:
+            self.current_learning_iteration = loaded_dict["iter"]
+            
+        return loaded_dict.get("infos", None)
 
     def learn(self, num_learning_iterations: int, init_at_random_ep_len: bool = False):
         """Override the learn method to monitor value function loss.
