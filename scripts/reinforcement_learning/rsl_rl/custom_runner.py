@@ -194,12 +194,21 @@ class CustomOnPolicyRunner(OnPolicyRunner):
                         print(f"Reducing learning rate from {self.alg.learning_rate:.6f} to {new_learning_rate:.6f}")
                         self.alg.learning_rate = new_learning_rate
                         
-                        # 環境をリセットして観測を再取得
+                        # 環境のリソースを適切に管理して再初期化
                         try:
-                            print("Resetting environment after loading checkpoint...")
+                            print("Preparing environment for checkpoint reload...")
+                            
+                            # ガベージコレクションを明示的に実行してメモリリークを防止
+                            import gc
+                            gc.collect()
+                            
                             # 環境をリセットする前に長めの一時停止を入れる（リソースの解放のため）
                             print("Waiting for resources to be released...")
                             time.sleep(5.0)
+                            
+                            # トーチのキャッシュをクリア
+                            if hasattr(torch, 'cuda'):
+                                torch.cuda.empty_cache()
                             
                             # 環境をリセット
                             print("Attempting to reset environment...")
@@ -210,11 +219,22 @@ class CustomOnPolicyRunner(OnPolicyRunner):
                             # エピソード長バッファをリセット
                             self.env.episode_length_buf = torch.zeros_like(self.env.episode_length_buf)
                             
+                            # 追加のガベージコレクション
+                            gc.collect()
+                            if hasattr(torch, 'cuda'):
+                                torch.cuda.empty_cache()
+                                
                             print("Environment successfully reset")
                         except Exception as e:
                             print(f"Error resetting environment: {e}")
                             print("Trying to get observations without reset...")
                             try:
+                                # ガベージコレクションを実行
+                                import gc
+                                gc.collect()
+                                if hasattr(torch, 'cuda'):
+                                    torch.cuda.empty_cache()
+                                    
                                 obs, extras = self.env.get_observations()
                                 privileged_obs = extras["observations"].get(self.privileged_obs_type, obs)
                                 obs, privileged_obs = obs.to(self.device), privileged_obs.to(self.device)
