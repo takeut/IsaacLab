@@ -197,10 +197,12 @@ class CustomOnPolicyRunner(OnPolicyRunner):
                         # 環境をリセットして観測を再取得
                         try:
                             print("Resetting environment after loading checkpoint...")
-                            # 環境をリセットする前に一時停止を入れる（リソースの解放のため）
-                            time.sleep(1.0)
+                            # 環境をリセットする前に長めの一時停止を入れる（リソースの解放のため）
+                            print("Waiting for resources to be released...")
+                            time.sleep(5.0)
                             
                             # 環境をリセット
+                            print("Attempting to reset environment...")
                             obs, extras = self.env.reset()
                             privileged_obs = extras["observations"].get(self.privileged_obs_type, obs)
                             obs, privileged_obs = obs.to(self.device), privileged_obs.to(self.device)
@@ -212,9 +214,14 @@ class CustomOnPolicyRunner(OnPolicyRunner):
                         except Exception as e:
                             print(f"Error resetting environment: {e}")
                             print("Trying to get observations without reset...")
-                            obs, extras = self.env.get_observations()
-                            privileged_obs = extras["observations"].get(self.privileged_obs_type, obs)
-                            obs, privileged_obs = obs.to(self.device), privileged_obs.to(self.device)
+                            try:
+                                obs, extras = self.env.get_observations()
+                                privileged_obs = extras["observations"].get(self.privileged_obs_type, obs)
+                                obs, privileged_obs = obs.to(self.device), privileged_obs.to(self.device)
+                                print("Successfully got observations without reset")
+                            except Exception as e2:
+                                print(f"Error getting observations: {e2}")
+                                print("Attempting to continue with previous observations...")
                         
                         # 現在のイテレーションを更新
                         self.current_learning_iteration = oldest_it
