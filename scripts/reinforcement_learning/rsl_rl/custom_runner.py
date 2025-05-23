@@ -275,3 +275,22 @@ class CustomOnPolicyRunner(OnPolicyRunner):
         # Save the final model after training
         if self.log_dir is not None and not self.disable_logs:
             self.save(os.path.join(self.log_dir, f"model_{self.current_learning_iteration}.pt"))
+            
+        # 終了時のリソースクリーンアップ
+        print("Cleaning up resources before exit...")
+        try:
+            # ガベージコレクションを実行
+            import gc
+            gc.collect()
+            
+            # PyTorchのCUDAキャッシュをクリア
+            if hasattr(torch, 'cuda'):
+                torch.cuda.empty_cache()
+                
+            # 明示的にバッファをクリア
+            if hasattr(self, 'checkpoint_history'):
+                self.checkpoint_history.clear()
+                
+            print("Resource cleanup completed")
+        except Exception as e:
+            print(f"Warning: Error during resource cleanup: {e}")
