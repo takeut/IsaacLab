@@ -31,7 +31,7 @@ class CustomOnPolicyRunner(OnPolicyRunner):
         super().__init__(env, train_cfg, log_dir, device)
         
         # 追加の設定
-        self.value_loss_threshold = 500.0  # value_function lossのしきい値
+        self.value_loss_threshold = 50.0  # value_function lossのしきい値
         self.checkpoint_history = deque(maxlen=3)  # 最新150(3x50)個のチェックポイントを保存
         self.original_learning_rate = self.alg.learning_rate  # 元の学習率を保存
         
@@ -243,8 +243,53 @@ class CustomOnPolicyRunner(OnPolicyRunner):
                 if self.training_type == "rl":
                     self.alg.compute_returns(privileged_obs)
 
+            # ポリシー更新前に標準偏差を確認
+            try:
+                # 標準偏差が負の値や異常値になっていないか確認
+                if hasattr(self.alg.policy, 'action_std'):
+                    action_std = self.alg.policy.action_std
+                    if torch.any(action_std < 0) or torch.any(torch.isnan(action_std)) or torch.any(torch.isinf(action_std)):
+                        print(f"[WARNING] Detected invalid action_std values: min={action_std.min().item()}, max={action_std.max().item()}")
+                        print("Resetting action_std to safe values...")
+                        # 安全な値（正の値）に設定
+                        with torch.no_grad():
+                            self.alg.policy.action_std.copy_(torch.clamp(self.alg.policy.action_std, min=1e-6))
+                        print(f"Action std reset to: min={self.alg.policy.action_std.min().item()}, max={self.alg.policy.action_std.max().item()}")
+            except Exception as e:
+                print(f"Error checking action_std: {e}")
+
             # update policy
-            loss_dict = self.alg.update()
+            try:
+                loss_dict = self.alg.update()
+            except RuntimeError as e:
+                if "normal expects all elements of std >= 0.0" in str(e):
+                    print("[ERROR] Caught std < 0 error during policy update. Attempting recovery...")
+                    # 最も古いチェックポイントからロードして回復を試みる
+                    if len(self.checkpoint_history) > 0:
+                        oldest_it, oldest_checkpoint = self.checkpoint_history[0]
+                        print(f"Loading checkpoint from iteration {oldest_it} for recovery")
+                        self.load(oldest_checkpoint, load_optimizer=True)
+                        
+                        # 学習率をさらに小さくする
+                        new_learning_rate = self.original_learning_rate * 0.01
+                        print(f"Reducing learning rate further to {new_learning_rate:.8f}")
+                        self.alg.learning_rate = new_learning_rate
+                        
+                        # 現在のイテレーションを更新
+                        self.current_learning_iteration = oldest_it
+                        it = oldest_it
+                        
+                        # 環境をリセット
+                        obs, extras = self.env.get_observations()
+                        privileged_obs = extras["observations"].get(self.privileged_obs_type, obs)
+                        obs, privileged_obs = obs.to(self.device), privileged_obs.to(self.device)
+                        
+                        # 空のloss_dictを作成して続行
+                        loss_dict = {"value_function": 0.0, "surrogate": 0.0, "entropy": 0.0}
+                        continue
+                else:
+                    # その他のエラーは再発生
+                    raise
 
             # チェックポイントの保存と監視
             if self.log_dir is not None and not self.disable_logs:
@@ -255,8 +300,10 @@ class CustomOnPolicyRunner(OnPolicyRunner):
                     self.checkpoint_history.append((it, checkpoint_path))
                 
                 # value_function lossの監視
-                if "value_function" in loss_dict and loss_dict["value_function"] > self.value_loss_threshold:
-                    print(f"\n[WARNING] Value function loss ({loss_dict['value_function']:.2f}) exceeded threshold ({self.value_loss_threshold:.2f})")
+                if "value_function" in loss_dict and (loss_dict["value_function"] > self.value_loss_threshold or 
+                                                     torch.isinf(torch.tensor(loss_dict["value_function"])) or 
+                                                     torch.isnan(torch.tensor(loss_dict["value_function"]))):
+                    print(f"\n[WARNING] Value function loss ({loss_dict['value_function']}) exceeded threshold ({self.value_loss_threshold:.2f}) or is inf/nan")
                     
                     # 100回前のチェックポイントがあれば、そこからロード
                     if len(self.checkpoint_history) > 0:
