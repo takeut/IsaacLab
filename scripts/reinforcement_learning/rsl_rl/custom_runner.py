@@ -32,7 +32,7 @@ class CustomOnPolicyRunner(OnPolicyRunner):
         
         # 追加の設定
         self.value_loss_threshold = 50.0  # value_function lossのしきい値
-        self.checkpoint_history = deque(maxlen=3)  # 最新3つのチェックポイントを保存
+        self.checkpoint_history = deque(maxlen=10)  # 最新10個のチェックポイントを保存
         self.original_learning_rate = self.alg.learning_rate  # 元の学習率を保存
         self.learning_rate_decay_factor = 0.1  # 学習率の減衰係数
         self.recovery_attempts = 0  # 回復試行回数
@@ -367,30 +367,33 @@ class CustomOnPolicyRunner(OnPolicyRunner):
             
         print(f"[RECOVERY ATTEMPT {self.recovery_attempts}/{self.max_recovery_attempts}] Reason: {reason}")
         
-        # チェックポイントがあるか確認
-        if len(self.checkpoint_history) == 0:
-            print("[ERROR] No checkpoints available for recovery.")
-            # チェックポイントがない場合でも、適切なタプルを返す
+        # チェックポイントが3つ以上あるか確認
+        if len(self.checkpoint_history) < 3:
+            print(f"[ERROR] Not enough checkpoints available for recovery. Need at least 3, but only have {len(self.checkpoint_history)}.")
+            # チェックポイントが不足している場合は、適切なタプルを返す
             return False, None, None, None
             
-        # 最も古いチェックポイントを取得
-        oldest_it, oldest_checkpoint = self.checkpoint_history[0]
-        print(f"Loading checkpoint from iteration {oldest_it}")
+        # 最新から3つ目のチェックポイントを取得
+        # checkpoint_historyは新しい順に並んでいるため、[-3]で3つ目を取得（最も古いものが0）
+        checkpoint_list = list(self.checkpoint_history)
+        target_it, target_checkpoint = checkpoint_list[-3]
+        print(f"Loading checkpoint from iteration {target_it} (3rd newest checkpoint)")
         
         # チェックポイントをロード
-        self.load(oldest_checkpoint, load_optimizer=True)
+        self.load(target_checkpoint, load_optimizer=True)
         
         # 学習率を減衰
         if decay_factor is None:
             decay_factor = self.learning_rate_decay_factor
         
-        # チェックポイントロード前の学習率を保存
-        pre_load_learning_rate = self.alg.learning_rate
+        # 回復試行回数に基づいて学習率を計算
+        # 初期学習率から段階的に減衰させる
+        # 例：初期学習率が0.001の場合、1回目は0.0001、2回目は0.00001、3回目は0.000001...
+        base_lr = self.original_learning_rate  # 初期学習率を使用
+        power = self.recovery_attempts  # 回復試行回数をべき乗として使用
+        current_learning_rate = base_lr * (decay_factor ** power)
         
-        # チェックポイントをロードした後、学習率を適切に設定
-        # チェックポイントの学習率ではなく、現在の減衰した学習率を使用
-        current_learning_rate = pre_load_learning_rate * decay_factor
-        print(f"Reducing learning rate from {pre_load_learning_rate:.8f} to {current_learning_rate:.8f}")
+        print(f"Setting learning rate to {current_learning_rate:.8f} (original: {base_lr:.8f}, decay: {decay_factor}, power: {power})")
         self.alg.learning_rate = current_learning_rate
         
         # 学習率の履歴を保存（デバッグ用）
@@ -450,20 +453,20 @@ class CustomOnPolicyRunner(OnPolicyRunner):
                 return False
         
         # 現在のイテレーションを更新
-        self.current_learning_iteration = oldest_it
+        self.current_learning_iteration = target_it
         
         # チェックポイント履歴から使用したチェックポイントのみを削除
         # 全てクリアするのではなく、使用したチェックポイントだけを削除
         if len(self.checkpoint_history) > 0:
             self.checkpoint_history.popleft()  # 最も古いチェックポイントを削除
         
-        print(f"Resumed training from iteration {oldest_it} with reduced learning rate")
+        print(f"Resumed training from iteration {target_it} with reduced learning rate")
         
         # 学習を再開するための状態を返す
-        print(f"Returning state for iteration {oldest_it}")
+        print(f"Returning state for iteration {target_it}")
         
         # 成功したかどうか、新しいイテレーション、新しい観測、新しい特権観測を返す
-        return True, oldest_it, obs, privileged_obs
+        return True, target_it, obs, privileged_obs
         
     def _ensure_valid_action_std(self, force_reset=False, min_std=1e-8, max_std=1e+8):
         """標準偏差が有効な値であることを確認する
