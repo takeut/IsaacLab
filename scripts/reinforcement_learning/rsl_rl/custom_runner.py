@@ -383,11 +383,21 @@ class CustomOnPolicyRunner(OnPolicyRunner):
         # 学習率を減衰
         if decay_factor is None:
             decay_factor = self.learning_rate_decay_factor
-            
-        # 現在の学習率を基準に減衰（複数回の回復でさらに減衰するように）
-        new_learning_rate = self.alg.learning_rate * decay_factor
-        print(f"Reducing learning rate from {self.alg.learning_rate:.8f} to {new_learning_rate:.8f}")
-        self.alg.learning_rate = new_learning_rate
+        
+        # チェックポイントロード前の学習率を保存
+        pre_load_learning_rate = self.alg.learning_rate
+        
+        # チェックポイントをロードした後、学習率を適切に設定
+        # チェックポイントの学習率ではなく、現在の減衰した学習率を使用
+        current_learning_rate = pre_load_learning_rate * decay_factor
+        print(f"Reducing learning rate from {pre_load_learning_rate:.8f} to {current_learning_rate:.8f}")
+        self.alg.learning_rate = current_learning_rate
+        
+        # 学習率の履歴を保存（デバッグ用）
+        if not hasattr(self, 'learning_rate_history'):
+            self.learning_rate_history = []
+        self.learning_rate_history.append((self.recovery_attempts, current_learning_rate))
+        print(f"Learning rate history: {self.learning_rate_history}")
         
         # 環境のリソースを適切に管理して再初期化
         try:
