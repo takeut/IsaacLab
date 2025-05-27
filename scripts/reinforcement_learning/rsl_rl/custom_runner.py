@@ -370,7 +370,8 @@ class CustomOnPolicyRunner(OnPolicyRunner):
         # チェックポイントがあるか確認
         if len(self.checkpoint_history) == 0:
             print("[ERROR] No checkpoints available for recovery.")
-            return False
+            # チェックポイントがない場合でも、適切なタプルを返す
+            return False, None, None, None
             
         # 最も古いチェックポイントを取得
         oldest_it, oldest_checkpoint = self.checkpoint_history[0]
