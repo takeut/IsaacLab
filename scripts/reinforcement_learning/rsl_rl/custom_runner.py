@@ -32,8 +32,11 @@ class CustomOnPolicyRunner(OnPolicyRunner):
         
         # 追加の設定
         self.value_loss_threshold = 50.0  # value_function lossのしきい値
-        self.checkpoint_history = deque(maxlen=3)  # 最新150(3x50)個のチェックポイントを保存
+        self.checkpoint_history = deque(maxlen=3)  # 最新3つのチェックポイントを保存
         self.original_learning_rate = self.alg.learning_rate  # 元の学習率を保存
+        self.learning_rate_decay_factor = 0.1  # 学習率の減衰係数
+        self.recovery_attempts = 0  # 回復試行回数
+        self.max_recovery_attempts = 100  # 最大回復試行回数
         
     def load(self, path: str, load_optimizer: bool = True):
         """チェックポイントからモデルをロードする（PyTorch推論モードの問題に対応）
@@ -185,8 +188,20 @@ class CustomOnPolicyRunner(OnPolicyRunner):
             # Rollout
             with torch.inference_mode():
                 for _ in range(self.num_steps_per_env):
+                    # 標準偏差をチェックして安全に保つ
+                    self._ensure_valid_action_std()
+                    
                     # Sample actions
-                    actions = self.alg.act(obs, privileged_obs)
+                    try:
+                        actions = self.alg.act(obs, privileged_obs)
+                    except RuntimeError as e:
+                        if "normal expects all elements of std >= 0.0" in str(e):
+                            print("[ERROR] Caught std < 0 error during action sampling.")
+                            # 標準偏差を修正して再試行
+                            self._ensure_valid_action_std(force_reset=True)
+                            actions = self.alg.act(obs, privileged_obs)
+                        else:
+                            raise
                     # Step the environment
                     obs, rewards, dones, infos = self.env.step(actions.to(self.env.device))
                     # Move to device
@@ -250,11 +265,18 @@ class CustomOnPolicyRunner(OnPolicyRunner):
                     action_std = self.alg.policy.action_std
                     if torch.any(action_std < 0) or torch.any(torch.isnan(action_std)) or torch.any(torch.isinf(action_std)):
                         print(f"[WARNING] Detected invalid action_std values: min={action_std.min().item()}, max={action_std.max().item()}")
-                        print("Resetting action_std to safe values...")
-                        # 安全な値（正の値）に設定
-                        with torch.no_grad():
-                            self.alg.policy.action_std.copy_(torch.clamp(self.alg.policy.action_std, min=1e-6))
-                        print(f"Action std reset to: min={self.alg.policy.action_std.min().item()}, max={self.alg.policy.action_std.max().item()}")
+                        # チェックポイントからロードして回復
+                        success, new_it, new_obs, new_privileged_obs = self._load_checkpoint_and_restart(it, "Invalid action_std detected", decay_factor=self.learning_rate_decay_factor)
+                        if success:
+                            # 状態を更新して学習を継続
+                            it = new_it
+                            obs = new_obs
+                            privileged_obs = new_privileged_obs
+                            # forループの次のイテレーションに進む
+                            continue
+                        else:
+                            # 回復に失敗した場合は学習を終了
+                            return False
             except Exception as e:
                 print(f"Error checking action_std: {e}")
 
@@ -263,30 +285,18 @@ class CustomOnPolicyRunner(OnPolicyRunner):
                 loss_dict = self.alg.update()
             except RuntimeError as e:
                 if "normal expects all elements of std >= 0.0" in str(e):
-                    print("[ERROR] Caught std < 0 error during policy update. Attempting recovery...")
-                    # 最も古いチェックポイントからロードして回復を試みる
-                    if len(self.checkpoint_history) > 0:
-                        oldest_it, oldest_checkpoint = self.checkpoint_history[0]
-                        print(f"Loading checkpoint from iteration {oldest_it} for recovery")
-                        self.load(oldest_checkpoint, load_optimizer=True)
-                        
-                        # 学習率をさらに小さくする
-                        new_learning_rate = self.original_learning_rate * 0.01
-                        print(f"Reducing learning rate further to {new_learning_rate:.8f}")
-                        self.alg.learning_rate = new_learning_rate
-                        
-                        # 現在のイテレーションを更新
-                        self.current_learning_iteration = oldest_it
-                        it = oldest_it
-                        
-                        # 環境をリセット
-                        obs, extras = self.env.get_observations()
-                        privileged_obs = extras["observations"].get(self.privileged_obs_type, obs)
-                        obs, privileged_obs = obs.to(self.device), privileged_obs.to(self.device)
-                        
-                        # 空のloss_dictを作成して続行
-                        loss_dict = {"value_function": 0.0, "surrogate": 0.0, "entropy": 0.0}
+                    print("[ERROR] Caught std < 0 error during policy update.")
+                    success, new_it, new_obs, new_privileged_obs = self._load_checkpoint_and_restart(it, "std < 0 error", decay_factor=self.learning_rate_decay_factor)
+                    if success:
+                        # 状態を更新して学習を継続
+                        it = new_it
+                        obs = new_obs
+                        privileged_obs = new_privileged_obs
+                        # forループの次のイテレーションに進む
                         continue
+                    else:
+                        # 回復に失敗した場合は学習を終了
+                        return False
                 else:
                     # その他のエラーは再発生
                     raise
@@ -304,79 +314,17 @@ class CustomOnPolicyRunner(OnPolicyRunner):
                                                      torch.isinf(torch.tensor(loss_dict["value_function"])) or 
                                                      torch.isnan(torch.tensor(loss_dict["value_function"]))):
                     print(f"\n[WARNING] Value function loss ({loss_dict['value_function']}) exceeded threshold ({self.value_loss_threshold:.2f}) or is inf/nan")
-                    
-                    # 100回前のチェックポイントがあれば、そこからロード
-                    if len(self.checkpoint_history) > 0:
-                        # 最も古いチェックポイントを取得
-                        oldest_it, oldest_checkpoint = self.checkpoint_history[0]
-                        print(f"Loading checkpoint from iteration {oldest_it}")
-                        
-                        # チェックポイントをロード
-                        self.load(oldest_checkpoint, load_optimizer=True)
-                        
-                        # 学習率を0.1倍に設定
-                        new_learning_rate = self.original_learning_rate * 0.1
-                        print(f"Reducing learning rate from {self.alg.learning_rate:.6f} to {new_learning_rate:.6f}")
-                        self.alg.learning_rate = new_learning_rate
-                        
-                        # 環境のリソースを適切に管理して再初期化
-                        try:
-                            print("Preparing environment for checkpoint reload...")
-                            
-                            # ガベージコレクションを明示的に実行してメモリリークを防止
-                            import gc
-                            gc.collect()
-                            
-                            # 環境をリセットする前に長めの一時停止を入れる（リソースの解放のため）
-                            print("Waiting for resources to be released...")
-                            time.sleep(5.0)
-                            
-                            # トーチのキャッシュをクリア
-                            if hasattr(torch, 'cuda'):
-                                torch.cuda.empty_cache()
-                            
-                            # 環境をリセット
-                            print("Attempting to reset environment...")
-                            obs, extras = self.env.reset()
-                            privileged_obs = extras["observations"].get(self.privileged_obs_type, obs)
-                            obs, privileged_obs = obs.to(self.device), privileged_obs.to(self.device)
-                            
-                            # エピソード長バッファをリセット
-                            self.env.episode_length_buf = torch.zeros_like(self.env.episode_length_buf)
-                            
-                            # 追加のガベージコレクション
-                            gc.collect()
-                            if hasattr(torch, 'cuda'):
-                                torch.cuda.empty_cache()
-                                
-                            print("Environment successfully reset")
-                        except Exception as e:
-                            print(f"Error resetting environment: {e}")
-                            print("Trying to get observations without reset...")
-                            try:
-                                # ガベージコレクションを実行
-                                import gc
-                                gc.collect()
-                                if hasattr(torch, 'cuda'):
-                                    torch.cuda.empty_cache()
-                                    
-                                obs, extras = self.env.get_observations()
-                                privileged_obs = extras["observations"].get(self.privileged_obs_type, obs)
-                                obs, privileged_obs = obs.to(self.device), privileged_obs.to(self.device)
-                                print("Successfully got observations without reset")
-                            except Exception as e2:
-                                print(f"Error getting observations: {e2}")
-                                print("Attempting to continue with previous observations...")
-                        
-                        # 現在のイテレーションを更新
-                        self.current_learning_iteration = oldest_it
-                        it = oldest_it
-                        
-                        # チェックポイント履歴をクリア
-                        self.checkpoint_history.clear()
-                        
-                        print(f"Resumed training from iteration {oldest_it} with reduced learning rate")
+                    success, new_it, new_obs, new_privileged_obs = self._load_checkpoint_and_restart(it, "Value function loss exceeded threshold", decay_factor=self.learning_rate_decay_factor)
+                    if success:
+                        # 状態を更新して学習を継続
+                        it = new_it
+                        obs = new_obs
+                        privileged_obs = new_privileged_obs
+                        # forループの次のイテレーションに進む
                         continue
+                    else:
+                        # 回復に失敗した場合は学習を終了
+                        return False
 
             stop = time.time()
             learn_time = stop - start
@@ -401,7 +349,160 @@ class CustomOnPolicyRunner(OnPolicyRunner):
         if self.log_dir is not None and not self.disable_logs:
             self.save(os.path.join(self.log_dir, f"model_{self.current_learning_iteration}.pt"))
             
-        # 終了時のリソースクリーンアップ
+    def _load_checkpoint_and_restart(self, current_it, reason, decay_factor=None):
+        """チェックポイントからロードして学習を再開するヘルパーメソッド
+
+        Args:
+            current_it: 現在のイテレーション
+            reason: 再開の理由
+            decay_factor: 学習率の減衰係数（Noneの場合はself.learning_rate_decay_factorを使用）
+
+        Returns:
+            tuple: (成功したかどうか, 新しいイテレーション, 新しい観測, 新しい特権観測)
+        """
+        self.recovery_attempts += 1
+        if self.recovery_attempts > self.max_recovery_attempts:
+            print(f"[ERROR] Maximum recovery attempts ({self.max_recovery_attempts}) reached. Stopping training.")
+            return False
+            
+        print(f"[RECOVERY ATTEMPT {self.recovery_attempts}/{self.max_recovery_attempts}] Reason: {reason}")
+        
+        # チェックポイントがあるか確認
+        if len(self.checkpoint_history) == 0:
+            print("[ERROR] No checkpoints available for recovery.")
+            return False
+            
+        # 最も古いチェックポイントを取得
+        oldest_it, oldest_checkpoint = self.checkpoint_history[0]
+        print(f"Loading checkpoint from iteration {oldest_it}")
+        
+        # チェックポイントをロード
+        self.load(oldest_checkpoint, load_optimizer=True)
+        
+        # 学習率を減衰
+        if decay_factor is None:
+            decay_factor = self.learning_rate_decay_factor
+            
+        # 現在の学習率を基準に減衰（複数回の回復でさらに減衰するように）
+        new_learning_rate = self.alg.learning_rate * decay_factor
+        print(f"Reducing learning rate from {self.alg.learning_rate:.8f} to {new_learning_rate:.8f}")
+        self.alg.learning_rate = new_learning_rate
+        
+        # 環境のリソースを適切に管理して再初期化
+        try:
+            print("Preparing environment for checkpoint reload...")
+            
+            # ガベージコレクションを明示的に実行してメモリリークを防止
+            import gc
+            gc.collect()
+            
+            # 環境をリセットする前に長めの一時停止を入れる（リソースの解放のため）
+            print("Waiting for resources to be released...")
+            time.sleep(5.0)
+            
+            # トーチのキャッシュをクリア
+            if hasattr(torch, 'cuda'):
+                torch.cuda.empty_cache()
+            
+            # 環境をリセット
+            print("Attempting to reset environment...")
+            obs, extras = self.env.reset()
+            privileged_obs = extras["observations"].get(self.privileged_obs_type, obs)
+            obs, privileged_obs = obs.to(self.device), privileged_obs.to(self.device)
+            
+            # エピソード長バッファをリセット
+            self.env.episode_length_buf = torch.zeros_like(self.env.episode_length_buf)
+            
+            # 追加のガベージコレクション
+            gc.collect()
+            if hasattr(torch, 'cuda'):
+                torch.cuda.empty_cache()
+                
+            print("Environment successfully reset")
+        except Exception as e:
+            print(f"Error resetting environment: {e}")
+            print("Trying to get observations without reset...")
+            try:
+                # ガベージコレクションを実行
+                import gc
+                gc.collect()
+                if hasattr(torch, 'cuda'):
+                    torch.cuda.empty_cache()
+                    
+                obs, extras = self.env.get_observations()
+                privileged_obs = extras["observations"].get(self.privileged_obs_type, obs)
+                obs, privileged_obs = obs.to(self.device), privileged_obs.to(self.device)
+                print("Successfully got observations without reset")
+            except Exception as e2:
+                print(f"Error getting observations: {e2}")
+                print("Attempting to continue with previous observations...")
+                return False
+        
+        # 現在のイテレーションを更新
+        self.current_learning_iteration = oldest_it
+        
+        # チェックポイント履歴をクリア（古いチェックポイントを再利用しないように）
+        self.checkpoint_history.clear()
+        
+        print(f"Resumed training from iteration {oldest_it} with reduced learning rate")
+        
+        # 学習を再開するための状態を返す
+        print(f"Returning state for iteration {oldest_it}")
+        
+        # 成功したかどうか、新しいイテレーション、新しい観測、新しい特権観測を返す
+        return True, oldest_it, obs, privileged_obs
+        
+    def _ensure_valid_action_std(self, force_reset=False, min_std=1e-8, max_std=1e+8):
+        """標準偏差が有効な値であることを確認する
+
+        Args:
+            force_reset: 強制的に標準偏差をリセットするかどうか
+            min_std: 最小の標準偏差値（0/nanの場合に使用）
+            max_std: 最大の標準偏差値（infの場合に使用）
+        """
+        try:
+            if hasattr(self.alg.policy, 'action_std'):
+                action_std = self.alg.policy.action_std
+                
+                # 標準偏差の問題をチェック
+                has_small_values = torch.any(action_std < min_std)
+                has_nan_values = torch.any(torch.isnan(action_std))
+                has_inf_values = torch.any(torch.isinf(action_std))
+                
+                # 問題がある場合または強制リセットが要求されている場合
+                if force_reset or has_small_values or has_nan_values or has_inf_values:
+                    if not force_reset:
+                        print(f"[WARNING] Detected problematic action_std values: min={action_std.min().item() if not has_nan_values else 'NaN'}, max={action_std.max().item() if not has_inf_values else 'Inf'}")
+                    else:
+                        print("[INFO] Forcing action_std reset")
+                    
+                    # 要素ごとに適切な値に修正
+                    with torch.no_grad():
+                        # 新しい標準偏差テンソルを作成
+                        new_std = action_std.clone()
+                        
+                        # 小さすぎる値またはNaNを最小値に置き換え
+                        small_or_nan_mask = (new_std < min_std) | torch.isnan(new_std)
+                        if torch.any(small_or_nan_mask):
+                            new_std[small_or_nan_mask] = min_std
+                            print(f"Reset {torch.sum(small_or_nan_mask).item()} small/NaN values to {min_std}")
+                        
+                        # 無限大の値を最大値に置き換え
+                        inf_mask = torch.isinf(new_std)
+                        if torch.any(inf_mask):
+                            new_std[inf_mask] = max_std
+                            print(f"Reset {torch.sum(inf_mask).item()} infinite values to {max_std}")
+                        
+                        # 更新された標準偏差を設定
+                        self.alg.policy.action_std.copy_(new_std)
+                        
+                    print(f"Action std updated: min={new_std.min().item()}, max={new_std.max().item()}, mean={new_std.mean().item()}")
+        except Exception as e:
+            print(f"Error in _ensure_valid_action_std: {e}")
+            
+    # 終了時のリソースクリーンアップ
+    def _cleanup_resources(self):
+        """終了時のリソースクリーンアップ"""
         print("Cleaning up resources before exit...")
         try:
             # ガベージコレクションを実行
