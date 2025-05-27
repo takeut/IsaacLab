@@ -442,8 +442,10 @@ class CustomOnPolicyRunner(OnPolicyRunner):
         # 現在のイテレーションを更新
         self.current_learning_iteration = oldest_it
         
-        # チェックポイント履歴をクリア（古いチェックポイントを再利用しないように）
-        self.checkpoint_history.clear()
+        # チェックポイント履歴から使用したチェックポイントのみを削除
+        # 全てクリアするのではなく、使用したチェックポイントだけを削除
+        if len(self.checkpoint_history) > 0:
+            self.checkpoint_history.popleft()  # 最も古いチェックポイントを削除
         
         print(f"Resumed training from iteration {oldest_it} with reduced learning rate")
         
