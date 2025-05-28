@@ -184,7 +184,7 @@ def run_train(args, recovery_mode=False, load_run=None, checkpoint=None, learnin
         train_args = [
             "video", "video_length", "video_interval", "num_envs", "task", "seed", 
             "max_iterations", "distributed", "load_run", "checkpoint", "resume", "device",
-            "headless", "enable_cameras", "hide_ui", "physics_gpu", "active_gpu"
+            "headless", "enable_cameras"
         ]
         
         # argsの内容をコマンドライン引数に変換
