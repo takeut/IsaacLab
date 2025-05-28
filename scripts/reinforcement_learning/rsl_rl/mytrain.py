@@ -183,7 +183,8 @@ def run_train(args, recovery_mode=False, load_run=None, checkpoint=None, learnin
         # train.pyが受け付ける引数のみを渡す
         train_args = [
             "video", "video_length", "video_interval", "num_envs", "task", "seed", 
-            "max_iterations", "distributed", "load_run", "checkpoint", "resume", "device"
+            "max_iterations", "distributed", "load_run", "checkpoint", "resume", "device",
+            "headless", "enable_cameras", "hide_ui", "physics_gpu", "active_gpu"
         ]
         
         # argsの内容をコマンドライン引数に変換
@@ -248,6 +249,14 @@ def main():
     if args_cli.task is None:
         logger.error("Task name is required. Please specify with --task.")
         return 1
+    
+    # experiment_nameが指定されていない場合のデフォルト値を設定
+    if not hasattr(args_cli, 'experiment_name') or args_cli.experiment_name is None:
+        # タスク名から実験名を推定
+        if 'Go2' in args_cli.task and 'Flat' in args_cli.task:
+            args_cli.experiment_name = 'unitree_go2_flat'
+        else:
+            args_cli.experiment_name = None
     
     # 回復試行回数のカウンタ
     recovery_attempt = 0
