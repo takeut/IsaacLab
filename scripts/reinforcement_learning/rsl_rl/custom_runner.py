@@ -32,9 +32,11 @@ class CustomOnPolicyRunner(OnPolicyRunner):
         
         # 追加の設定
         self.value_loss_threshold = 50.0  # value_function lossのしきい値
-        self.checkpoint_history = deque(maxlen=10)  # 最新10個のチェックポイントを保存
+        self.checkpoint_history = deque(maxlen=6)  # 最新10個のチェックポイントを保存
+        self.used_checkpoints = set()  # 使用済みのチェックポイントを記録
         self.original_learning_rate = self.alg.learning_rate  # 元の学習率を保存
         self.learning_rate_decay_factor = 0.1  # 学習率の減衰係数
+        self.min_learning_rate = 1e-10  # 学習率の下限
         self.recovery_attempts = 0  # 回復試行回数
         self.max_recovery_attempts = 100  # 最大回復試行回数
         
@@ -373,11 +375,28 @@ class CustomOnPolicyRunner(OnPolicyRunner):
             # チェックポイントが不足している場合は、適切なタプルを返す
             return False, None, None, None
             
-        # 最新から3つ目のチェックポイントを取得
-        # checkpoint_historyは新しい順に並んでいるため、[-3]で3つ目を取得（最も古いものが0）
-        checkpoint_list = list(self.checkpoint_history)
-        target_it, target_checkpoint = checkpoint_list[-3]
-        print(f"Loading checkpoint from iteration {target_it} (3rd newest checkpoint)")
+        # 使用可能なチェックポイントを取得（使用済みのものを除外）
+        available_checkpoints = [(it, path) for it, path in self.checkpoint_history if it not in self.used_checkpoints]
+        
+        # 使用可能なチェックポイントがない場合
+        if len(available_checkpoints) == 0:
+            print("[WARNING] All checkpoints have been used. Resetting used_checkpoints set.")
+            self.used_checkpoints.clear()  # 使用済みチェックポイントをリセット
+            available_checkpoints = list(self.checkpoint_history)
+        
+        # 使用可能なチェックポイントが3つ未満の場合
+        if len(available_checkpoints) < 3:
+            print(f"[WARNING] Less than 3 available checkpoints. Using the oldest available checkpoint.")
+            # 最も古いチェックポイントを使用
+            target_it, target_checkpoint = available_checkpoints[0]
+        else:
+            # 最新から3つ目のチェックポイントを取得
+            target_it, target_checkpoint = available_checkpoints[-3]
+            
+        print(f"Loading checkpoint from iteration {target_it}")
+        
+        # 使用済みチェックポイントとして記録
+        self.used_checkpoints.add(target_it)
         
         # チェックポイントをロード
         self.load(target_checkpoint, load_optimizer=True)
@@ -391,9 +410,9 @@ class CustomOnPolicyRunner(OnPolicyRunner):
         # 例：初期学習率が0.001の場合、1回目は0.0001、2回目は0.00001、3回目は0.000001...
         base_lr = self.original_learning_rate  # 初期学習率を使用
         power = self.recovery_attempts  # 回復試行回数をべき乗として使用
-        current_learning_rate = base_lr * (decay_factor ** power)
+        current_learning_rate = max(base_lr * (decay_factor ** power), self.min_learning_rate)  # 下限を適用
         
-        print(f"Setting learning rate to {current_learning_rate:.8f} (original: {base_lr:.8f}, decay: {decay_factor}, power: {power})")
+        print(f"Setting learning rate to {current_learning_rate:.8f} (original: {base_lr:.8f}, decay: {decay_factor}, power: {power}, min: {self.min_learning_rate:.8f})")
         self.alg.learning_rate = current_learning_rate
         
         # 学習率の履歴を保存（デバッグ用）
@@ -418,38 +437,57 @@ class CustomOnPolicyRunner(OnPolicyRunner):
             if hasattr(torch, 'cuda'):
                 torch.cuda.empty_cache()
             
-            # 環境をリセット
-            print("Attempting to reset environment...")
-            obs, extras = self.env.reset()
+            # モデルの状態をリセット（特にvalue_function関連）
+            print("Resetting model state...")
+            self.alg.policy.reset()  # ポリシーのリセット（存在する場合）
+            
+            # 学習率を明示的に設定（下限を適用）
+            self.alg.learning_rate = max(current_learning_rate, self.min_learning_rate)
+            print(f"Explicitly setting learning rate to {self.alg.learning_rate:.10f}")
+            
+            # 環境をリセット（推論モードの問題に対応）
+            print("Attempting to reset environment with inference mode handling...")
+            try:
+                # 通常のリセットを試みる
+                obs, extras = self.env.reset()
+            except Exception as e1:
+                print(f"Standard reset failed: {e1}")
+                print("Trying alternative reset approach...")
+                
+                # 代替アプローチ：観測値の取得
+                obs, extras = self.env.get_observations()
+                print("Successfully got observations")
+                
+                # 環境の内部状態を可能な限りリセット
+                try:
+                    # エピソード長バッファをリセット
+                    self.env.episode_length_buf = torch.zeros_like(self.env.episode_length_buf)
+                    print("Reset episode length buffer")
+                except Exception as e2:
+                    print(f"Warning: Could not reset episode length buffer: {e2}")
+            
+            # 観測値を処理
             privileged_obs = extras["observations"].get(self.privileged_obs_type, obs)
             obs, privileged_obs = obs.to(self.device), privileged_obs.to(self.device)
-            
-            # エピソード長バッファをリセット
-            self.env.episode_length_buf = torch.zeros_like(self.env.episode_length_buf)
             
             # 追加のガベージコレクション
             gc.collect()
             if hasattr(torch, 'cuda'):
                 torch.cuda.empty_cache()
                 
-            print("Environment successfully reset")
+            print("Environment initialization completed")
         except Exception as e:
-            print(f"Error resetting environment: {e}")
-            print("Trying to get observations without reset...")
+            print(f"Error in environment initialization: {e}")
+            print("Attempting to continue with minimal state...")
             try:
-                # ガベージコレクションを実行
-                import gc
-                gc.collect()
-                if hasattr(torch, 'cuda'):
-                    torch.cuda.empty_cache()
-                    
+                # 最小限の状態で継続を試みる
                 obs, extras = self.env.get_observations()
                 privileged_obs = extras["observations"].get(self.privileged_obs_type, obs)
                 obs, privileged_obs = obs.to(self.device), privileged_obs.to(self.device)
-                print("Successfully got observations without reset")
+                print("Got minimal observations to continue")
             except Exception as e2:
-                print(f"Error getting observations: {e2}")
-                print("Attempting to continue with previous observations...")
+                print(f"Fatal error getting observations: {e2}")
+                print("Cannot continue without valid observations")
                 return False
         
         # 現在のイテレーションを更新
