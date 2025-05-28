@@ -75,7 +75,6 @@ import torch
 from datetime import datetime
 
 from rsl_rl.runners import OnPolicyRunner
-from custom_runner import CustomOnPolicyRunner
 
 from isaaclab.envs import (
     DirectMARLEnv,
@@ -165,7 +164,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
 
     # create runner from rsl-rl (using custom runner for value function loss monitoring)
-    runner = CustomOnPolicyRunner(env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device)
+    runner = OnPolicyRunner(env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device)
     # write git state to logs
     runner.add_git_repo_to_log(__file__)
     # load the checkpoint
