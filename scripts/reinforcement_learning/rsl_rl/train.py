@@ -262,6 +262,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
                 # 学習率を修正して再試行
                 print(f"[INFO]: Loading model checkpoint from: {resume_path}")
+                runner.alg.storage.clear()
                 runner.load(resume_path)
 
                 learning_rate = runner.alg.learning_rate
