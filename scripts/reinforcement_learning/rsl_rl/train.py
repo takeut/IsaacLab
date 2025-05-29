@@ -239,8 +239,6 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True)
             break
         except RuntimeError as e:
-            env.close()
-            time.sleep(5)
             print(f"[ERROR] checking action_std: {e}")
             if "normal expects all elements of std >= 0.0" in str(e):
                 print(f"[ERROR] Caught std < 0 error during action sampling.")
@@ -257,6 +255,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                 # agent_cfg.load_checkpoint = recovery_checkpoint
                 # resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
                 
+                env.close()
+                time.sleep(5)
                 env = createRslRlEnv(env_cfg, agent_cfg, log_dir)
 
                 # 学習率を修正して再試行
