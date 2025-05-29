@@ -127,14 +127,14 @@ def createRslRlEnv(env_cfg, agent_cfg, log_dir):
 
     return env
 
-def find_checkpoints(log_dir):
+def find_checkpoints(log_dir) -> list[str]:
     """ログディレクトリ内のチェックポイントを見つける"""
     try:
         # チェックポイントファイルの一覧を取得
         checkpoint_files = glob.glob(os.path.join(log_dir, "model_*.pt"))
         
         if not checkpoint_files:
-            print("[WARNING] No checkpoint files found in {log_dir}")
+            print(f"[WARNING] No checkpoint files found in {log_dir}")
             return []
             
         # チェックポイントファイルをイテレーション番号でソート
@@ -145,27 +145,31 @@ def find_checkpoints(log_dir):
             return 0
             
         sorted_checkpoints = sorted(checkpoint_files, key=get_iteration)
-        print("[INFO] Found {len(sorted_checkpoints)} checkpoints in {log_dir}")
+        print(f"[INFO] Found {len(sorted_checkpoints)} checkpoints in {log_dir}")
         return sorted_checkpoints
     except Exception as e:
-        print("[WARNING] finding checkpoints: {e}")
+        print(f"[WARNING] finding checkpoints: {e}")
         return []
 
-def get_checkpoint_for_recovery(log_dir):
-    """回復用のチェックポイントを取得する（最新から2つ前）"""
+def get_checkpoint_for_recovery(log_dir) -> str:
+    """回復用のチェックポイントを取得する（最新から2つ前）
+    
+    Returns:
+        The path to the model checkpoint.
+    """
     checkpoints = find_checkpoints(log_dir)
     
     if len(checkpoints) < 3:
-        print("[WARNING] Not enough checkpoints for recovery. Found only {len(checkpoints)} checkpoints.")
+        print(f"[WARNING] Not enough checkpoints for recovery. Found only {len(checkpoints)} checkpoints.")
         if checkpoints:
             # 少なくとも1つのチェックポイントがある場合は最も古いものを使用
             print("[INFO] Using oldest available checkpoint: {checkpoints[0]}")
             return checkpoints[0]
-        return None
+        raise ValueError(f"No checkpoints in the directory: '{log_dir}'.")
     
     # 最新から2つ前のチェックポイントを取得
     recovery_checkpoint = checkpoints[-3]
-    print("[INFO] Selected recovery checkpoint: {recovery_checkpoint} (3rd newest)")
+    print(f"[INFO] Selected recovery checkpoint: {recovery_checkpoint} (3rd newest)")
     return recovery_checkpoint
 
 @hydra_task_config(args_cli.task, "rsl_rl_cfg_entry_point")
@@ -235,33 +239,28 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True)
             break
         except RuntimeError as e:
-            print("[ERROR] checking action_std: {e}")
-            # loss_dict = runner.alg.update()
-            value_loss_threshold = 50
-
-            learning_rate_decay_factor = 0.5
-            min_learning_rate = 1e-6 # 0.0005
-            entropy_coef_reduction_factor = 0.0005
-            min_entropy_coef = 0.001 # 0.005
-            value_loss_coef_reduction_factor = 0.005
-            min_value_loss_coef = 0.1 # 0.5
-
             env.close()
             time.sleep(5)
-
-            # recovery checkpoint
-            recovery_checkpoint = get_checkpoint_for_recovery(log_dir)
-            agent_cfg.load_checkpoint = recovery_checkpoint
-            resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
-            
-            env = createRslRlEnv(env_cfg, agent_cfg, log_dir)
+            print(f"[ERROR] checking action_std: {e}")
             if "normal expects all elements of std >= 0.0" in str(e):
-            # if "normal expects all elements of std >= 0.0" in str(e) or (
-            #     "value_function" in loss_dict and (loss_dict["value_function"] > value_loss_threshold or 
-            #                                         torch.isinf(torch.tensor(loss_dict["value_function"])) or 
-            #                                         torch.isnan(torch.tensor(loss_dict["value_function"])))):
-                print("[ERROR] Caught std < 0 error during action sampling.")
+                print(f"[ERROR] Caught std < 0 error during action sampling.")
+                # value_loss_threshold = 50
+                learning_rate_decay_factor = 0.5
+                min_learning_rate = 1e-6 # default is 0.0005.
+                entropy_coef_reduction_factor = 0.0005
+                min_entropy_coef = 0.001 # default is 0.005.
+                value_loss_coef_reduction_factor = 0.005
+                min_value_loss_coef = 0.1 # default is 0.5.
+
+                # get recovery checkpoint
+                resume_path = get_checkpoint_for_recovery(log_dir)
+                # agent_cfg.load_checkpoint = recovery_checkpoint
+                # resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
+                
+                env = createRslRlEnv(env_cfg, agent_cfg, log_dir)
+
                 # 学習率を修正して再試行
+                print(f"[INFO]: Loading model checkpoint from: {resume_path}")
                 runner.load(resume_path)
 
                 learning_rate = runner.alg.learning_rate
@@ -283,6 +282,9 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                 runner.alg.learning_rate = new_learning_rate
                 runner.alg.entropy_coef = new_entropy_coef
                 runner.alg.value_loss_coef = new_value_loss_coef
+                print(f"[INFO]: New learning_rate: {runner.alg.learning_rate}")
+                print(f"[INFO]: New entropy_coef: {runner.alg.entropy_coef}")
+                print(f"[INFO]: New value_loss_coef: {runner.alg.value_loss_coef}")
             else:
                 raise
 
