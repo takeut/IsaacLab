@@ -102,7 +102,7 @@ torch.backends.cudnn.allow_tf32 = True
 torch.backends.cudnn.deterministic = False
 torch.backends.cudnn.benchmark = False
 
-def createRslRlEnv(env_cfg, agent_cfg, log_root_path, log_dir):
+def createRslRlEnv(env_cfg, agent_cfg, log_dir):
     # create isaac environment
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
 
@@ -205,7 +205,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         log_dir += f"_{agent_cfg.run_name}"
     log_dir = os.path.join(log_root_path, log_dir)
 
-    env = createRslRlEnv(env_cfg, agent_cfg, log_root_path, log_dir)
+    env = createRslRlEnv(env_cfg, agent_cfg, log_dir)
 
     # save resume path before creating a new log_dir
     if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
@@ -230,7 +230,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     # run training
     recovery_attempts = 0
     max_recovery_attempts = 100
-    while recovery_attempts > max_recovery_attempts:
+    while recovery_attempts < max_recovery_attempts:
         try:
             runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True)
             break
@@ -247,7 +247,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             agent_cfg.load_checkpoint = recovery_checkpoint
             resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
             
-            env = createRslRlEnv(env_cfg, agent_cfg, log_root_path, log_dir)
+            env = createRslRlEnv(env_cfg, agent_cfg, log_dir)
             if "normal expects all elements of std >= 0.0" in str(e) or (
                 "value_function" in loss_dict and (loss_dict["value_function"] > value_loss_threshold or 
                                                     torch.isinf(torch.tensor(loss_dict["value_function"])) or 
