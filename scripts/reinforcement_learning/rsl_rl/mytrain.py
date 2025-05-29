@@ -7,25 +7,19 @@
 
 """Script to train RL agent with RSL-RL with automatic recovery from errors."""
 
-"""Launch Isaac Sim Simulator first."""
-
-import argparse
-import sys
 import os
+import sys
 import time
 import glob
+import argparse
 import re
 import logging
+import importlib
 import traceback
 import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import List, Tuple, Optional, Dict, Any
-
-from isaaclab.app import AppLauncher
-
-# local imports
-import cli_args  # isort: skip
 
 # ロギングの設定
 logging.basicConfig(
@@ -38,51 +32,23 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# add argparse arguments
-parser = argparse.ArgumentParser(description="Train an RL agent with RSL-RL with automatic recovery.")
-parser.add_argument("--video", action="store_true", default=False, help="Record videos during training.")
-parser.add_argument("--video_length", type=int, default=200, help="Length of the recorded video (in steps).")
-parser.add_argument("--video_interval", type=int, default=2000, help="Interval between video recordings (in steps).")
-parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
-parser.add_argument("--task", type=str, default=None, help="Name of the task.")
-parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
-parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
-parser.add_argument(
-    "--distributed", action="store_true", default=False, help="Run training with multiple GPUs or nodes."
-)
+# isaaclab.appをインポート
+from isaaclab.app import AppLauncher
 
-# mytrain.py固有の引数を追加
-parser.add_argument("--recovery_attempts", type=int, default=10, help="Maximum number of recovery attempts.")
-parser.add_argument("--learning_rate_scale", type=float, default=0.5, help="Learning rate scale factor for recovery.")
-parser.add_argument("--experiment_name", type=str, default=None, help="Experiment name for recovery.")
+# local imports
+import cli_args
+import isaaclab_tasks
+from isaaclab_tasks.utils import get_checkpoint_path
 
-# append RSL-RL cli arguments
-cli_args.add_rsl_rl_args(parser)
-# append AppLauncher cli args
-AppLauncher.add_app_launcher_args(parser)
-args_cli, hydra_args = parser.parse_known_args()
-
-# always enable cameras to record video
-if args_cli.video:
-    args_cli.enable_cameras = True
-
-# clear out sys.argv for Hydra
-sys.argv = [sys.argv[0]] + hydra_args
-
-# launch omniverse app
-app_launcher = AppLauncher(args_cli)
-simulation_app = app_launcher.app
-
-"""Rest everything follows."""
-
+# 必要なモジュールをインポート
 import gymnasium as gym
 import torch
 import importlib.metadata as metadata
 from packaging import version
 
-# 必要なモジュールをインポート（AppLauncher初期化後）
-import isaaclab_tasks
-from isaaclab_tasks.utils import get_checkpoint_path
+# train.pyのmain関数をインポート
+# 注意: train.pyのmain関数は@hydra_task_configデコレータで装飾されているため、
+# 直接インポートして呼び出すことはできません。代わりに、train.pyの内容を再実装します。
 
 
 def find_latest_log_dir(base_path="logs/rsl_rl", experiment_name=None):
@@ -239,23 +205,47 @@ def run_train(args, recovery_mode=False, load_run=None, checkpoint=None, learnin
 
 
 def main():
+    # コマンドライン引数の解析
+    parser = argparse.ArgumentParser(description="Train an RL agent with RSL-RL with automatic recovery.")
+    
+    # train.pyと同じ引数を追加
+    parser.add_argument("--video", action="store_true", default=False, help="Record videos during training.")
+    parser.add_argument("--video_length", type=int, default=200, help="Length of the recorded video (in steps).")
+    parser.add_argument("--video_interval", type=int, default=2000, help="Interval between video recordings (in steps).")
+    parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
+    parser.add_argument("--task", type=str, default=None, help="Name of the task.")
+    parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
+    parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
+    parser.add_argument("--distributed", action="store_true", default=False, help="Run training with multiple GPUs or nodes.")
+    parser.add_argument("--headless", action="store_true", default=False, help="Run in headless mode.")
+    parser.add_argument("--load_run", type=str, default=None, help="Run directory to load from.")
+    parser.add_argument("--checkpoint", type=str, default=None, help="Checkpoint to load.")
+    parser.add_argument("--resume", type=str, default=None, help="Resume training from checkpoint.")
+    parser.add_argument("--device", type=str, default=None, help="Device to use for training.")
+    
+    # mytrain.py固有の引数を追加
+    parser.add_argument("--recovery_attempts", type=int, default=10, help="Maximum number of recovery attempts.")
+    parser.add_argument("--learning_rate_scale", type=float, default=0.5, help="Learning rate scale factor for recovery.")
+    
+    args = parser.parse_args()
+    
     # 必須引数のチェック
-    if args_cli.task is None:
+    if args.task is None:
         logger.error("Task name is required. Please specify with --task.")
         return 1
     
     # 回復試行回数のカウンタ
     recovery_attempt = 0
     
-    while recovery_attempt <= args_cli.recovery_attempts:
+    while recovery_attempt <= args.recovery_attempts:
         # 回復モードかどうか
         recovery_mode = recovery_attempt > 0
         
         if recovery_mode:
-            logger.info(f"Starting recovery attempt {recovery_attempt}/{args_cli.recovery_attempts}")
+            logger.info(f"Starting recovery attempt {recovery_attempt}/{args.recovery_attempts}")
             
             # 最新のログディレクトリを見つける
-            log_dir = find_latest_log_dir(experiment_name=args_cli.experiment_name)
+            log_dir = find_latest_log_dir(experiment_name=args.experiment_name)
             if log_dir is None:
                 logger.error("Could not find log directory for recovery.")
                 return 1
@@ -271,14 +261,14 @@ def main():
             checkpoint = extract_checkpoint_name_from_path(checkpoint_path)
             
             # 学習率のスケール係数を計算（回復試行ごとに0.5倍）
-            learning_rate_scale = args_cli.learning_rate_scale ** recovery_attempt
+            learning_rate_scale = args.learning_rate_scale ** recovery_attempt
             
             # train.pyを実行（回復モード）
-            return_code = run_train(args_cli, recovery_mode=True, load_run=load_run, checkpoint=checkpoint, learning_rate_scale=learning_rate_scale)
+            return_code = run_train(args, recovery_mode=True, load_run=load_run, checkpoint=checkpoint, learning_rate_scale=learning_rate_scale)
         else:
             # 通常モードでtrain.pyを実行
             logger.info("Starting training in normal mode")
-            return_code = run_train(args_cli)
+            return_code = run_train(args)
         
         # 正常終了した場合
         if return_code == 0:
@@ -292,19 +282,13 @@ def main():
         # 回復試行の間に少し待機
         time.sleep(5)
     
-    logger.error(f"Maximum recovery attempts ({args_cli.recovery_attempts}) reached. Giving up.")
+    logger.error(f"Maximum recovery attempts ({args.recovery_attempts}) reached. Giving up.")
     return 1
 
 
 if __name__ == "__main__":
     try:
-        # run the main function
-        main()
+        sys.exit(main())
     except KeyboardInterrupt:
         logger.info("Training interrupted by user.")
         sys.exit(130)  # 130はSIGINTの標準的な終了コード
-    finally:
-        # close sim app
-        print("Closing simulation app...")
-        simulation_app.close()
-        print("Simulation app closed")
