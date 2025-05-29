@@ -73,6 +73,9 @@ import gymnasium as gym
 import os
 import torch
 from datetime import datetime
+import time
+import glob
+import re
 
 from rsl_rl.runners import OnPolicyRunner
 
@@ -99,6 +102,71 @@ torch.backends.cudnn.allow_tf32 = True
 torch.backends.cudnn.deterministic = False
 torch.backends.cudnn.benchmark = False
 
+def createRslRlEnv(env_cfg, agent_cfg, log_root_path, log_dir):
+    # create isaac environment
+    env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
+
+    # convert to single-agent instance if required by the RL algorithm
+    if isinstance(env.unwrapped, DirectMARLEnv):
+        env = multi_agent_to_single_agent(env)
+
+    # wrap for video recording
+    if args_cli.video:
+        video_kwargs = {
+            "video_folder": os.path.join(log_dir, "videos", "train"),
+            "step_trigger": lambda step: step % args_cli.video_interval == 0,
+            "video_length": args_cli.video_length,
+            "disable_logger": True,
+        }
+        print("[INFO] Recording videos during training.")
+        print_dict(video_kwargs, nesting=4)
+        env = gym.wrappers.RecordVideo(env, **video_kwargs)
+
+    # wrap around environment for rsl-rl
+    env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
+
+    return env
+
+def find_checkpoints(log_dir):
+    """ログディレクトリ内のチェックポイントを見つける"""
+    try:
+        # チェックポイントファイルの一覧を取得
+        checkpoint_files = glob.glob(os.path.join(log_dir, "model_*.pt"))
+        
+        if not checkpoint_files:
+            print("[WARNING] No checkpoint files found in {log_dir}")
+            return []
+            
+        # チェックポイントファイルをイテレーション番号でソート
+        def get_iteration(filename):
+            match = re.search(r'model_(\d+)\.pt', os.path.basename(filename))
+            if match:
+                return int(match.group(1))
+            return 0
+            
+        sorted_checkpoints = sorted(checkpoint_files, key=get_iteration)
+        print("[INFO] Found {len(sorted_checkpoints)} checkpoints in {log_dir}")
+        return sorted_checkpoints
+    except Exception as e:
+        print("[WARNING] finding checkpoints: {e}")
+        return []
+
+def get_checkpoint_for_recovery(log_dir):
+    """回復用のチェックポイントを取得する（最新から2つ前）"""
+    checkpoints = find_checkpoints(log_dir)
+    
+    if len(checkpoints) < 3:
+        print("[WARNING] Not enough checkpoints for recovery. Found only {len(checkpoints)} checkpoints.")
+        if checkpoints:
+            # 少なくとも1つのチェックポイントがある場合は最も古いものを使用
+            print("[INFO] Using oldest available checkpoint: {checkpoints[0]}")
+            return checkpoints[0]
+        return None
+    
+    # 最新から2つ前のチェックポイントを取得
+    recovery_checkpoint = checkpoints[-3]
+    print("[INFO] Selected recovery checkpoint: {recovery_checkpoint} (3rd newest)")
+    return recovery_checkpoint
 
 @hydra_task_config(args_cli.task, "rsl_rl_cfg_entry_point")
 def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agent_cfg: RslRlOnPolicyRunnerCfg):
@@ -137,31 +205,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         log_dir += f"_{agent_cfg.run_name}"
     log_dir = os.path.join(log_root_path, log_dir)
 
-    # create isaac environment
-    env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
-
-    # convert to single-agent instance if required by the RL algorithm
-    if isinstance(env.unwrapped, DirectMARLEnv):
-        env = multi_agent_to_single_agent(env)
+    env = createRslRlEnv(env_cfg, agent_cfg, log_root_path, log_dir)
 
     # save resume path before creating a new log_dir
     if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
         resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
-
-    # wrap for video recording
-    if args_cli.video:
-        video_kwargs = {
-            "video_folder": os.path.join(log_dir, "videos", "train"),
-            "step_trigger": lambda step: step % args_cli.video_interval == 0,
-            "video_length": args_cli.video_length,
-            "disable_logger": True,
-        }
-        print("[INFO] Recording videos during training.")
-        print_dict(video_kwargs, nesting=4)
-        env = gym.wrappers.RecordVideo(env, **video_kwargs)
-
-    # wrap around environment for rsl-rl
-    env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
 
     # create runner from rsl-rl
     runner = OnPolicyRunner(env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device)
@@ -180,7 +228,39 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     dump_pickle(os.path.join(log_dir, "params", "agent.pkl"), agent_cfg)
 
     # run training
-    runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True)
+    recovery_attempts = 0
+    max_recovery_attempts = 100
+    while recovery_attempts > max_recovery_attempts:
+        try:
+            runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True)
+            break
+        except RuntimeError as e:
+            loss_dict = runner.alg.update()
+            value_loss_threshold = 50
+            learning_rate_decay_factor = 0.5
+
+            env.close()
+            time.sleep(5)
+
+            # recovery checkpoint
+            recovery_checkpoint = get_checkpoint_for_recovery(log_dir)
+            agent_cfg.load_checkpoint = recovery_checkpoint
+            resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
+            
+            env = createRslRlEnv(env_cfg, agent_cfg, log_root_path, log_dir)
+            if "normal expects all elements of std >= 0.0" in str(e) or (
+                "value_function" in loss_dict and (loss_dict["value_function"] > value_loss_threshold or 
+                                                    torch.isinf(torch.tensor(loss_dict["value_function"])) or 
+                                                    torch.isnan(torch.tensor(loss_dict["value_function"])))):
+                print("[ERROR] Caught std < 0 error during action sampling.")
+                # 学習率を修正して再試行
+                runner.load(resume_path)
+                learning_rate = runner.alg.learning_rate
+                new_learning_rate = learning_rate * learning_rate_decay_factor
+                time.sleep(5)
+                runner.alg.learning_rate = new_learning_rate
+            else:
+                raise
 
     # close the simulator
     env.close()
