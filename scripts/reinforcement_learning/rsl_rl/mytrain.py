@@ -54,7 +54,7 @@ parser.add_argument(
 # mytrain.py固有の引数を追加
 parser.add_argument("--recovery_attempts", type=int, default=10, help="Maximum number of recovery attempts.")
 parser.add_argument("--learning_rate_scale", type=float, default=0.5, help="Learning rate scale factor for recovery.")
-parser.add_argument("--experiment_name", type=str, default="unitree_go2_flat", help="Experiment name for recovery.")
+# parser.add_argument("--experiment_name", type=str, default=None, help="Experiment name for recovery.")
 
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
@@ -181,16 +181,10 @@ def run_train(args, recovery_mode=False, load_run=None, checkpoint=None, learnin
         # コマンドを構築
         cmd = [isaaclab_script, "-p", "scripts/reinforcement_learning/rsl_rl/train_wrapper.py"]
         
-        # train.pyが受け付ける引数のみを渡す
-        train_args = [
-            "video", "video_length", "video_interval", "num_envs", "task", "seed", 
-            "max_iterations", "distributed", "load_run", "checkpoint", "resume", "device"
-        ]
-        
         # argsの内容をコマンドライン引数に変換
         for arg_name, arg_value in vars(args).items():
-            # train.pyが受け付ける引数のみを処理
-            if arg_name not in train_args:
+            # recovery_attempts, learning_rate_scaleはtrain.pyに渡さない
+            if arg_name in ["recovery_attempts", "learning_rate_scale", "experiment_name"]:
                 continue
                 
             if arg_value is not None:
