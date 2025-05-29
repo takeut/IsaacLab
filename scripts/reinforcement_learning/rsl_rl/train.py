@@ -102,9 +102,10 @@ torch.backends.cudnn.allow_tf32 = True
 torch.backends.cudnn.deterministic = False
 torch.backends.cudnn.benchmark = False
 
-def createRslRlEnv(env_cfg, agent_cfg, log_root_path, log_dir):
+def createRslRlEnv(env_cfg, agent_cfg, log_dir):
     # create isaac environment
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
+    print("[INFO] Created isaac environment.")
 
     # convert to single-agent instance if required by the RL algorithm
     if isinstance(env.unwrapped, DirectMARLEnv):
@@ -124,6 +125,7 @@ def createRslRlEnv(env_cfg, agent_cfg, log_root_path, log_dir):
 
     # wrap around environment for rsl-rl
     env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
+    print("[INFO] Created RslRlVecEnvWrapper.")
 
     return env
 
@@ -206,7 +208,32 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     log_dir = os.path.join(log_root_path, log_dir)
 
     print("****** createRslRlEnv *******")
-    env = createRslRlEnv(env_cfg, agent_cfg, log_root_path, log_dir)
+    # env = createRslRlEnv(env_cfg, agent_cfg, log_dir)
+
+    # create isaac environment
+    env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
+    print("[INFO] Created isaac environment.")
+
+    # convert to single-agent instance if required by the RL algorithm
+    if isinstance(env.unwrapped, DirectMARLEnv):
+        env = multi_agent_to_single_agent(env)
+
+    # wrap for video recording
+    if args_cli.video:
+        video_kwargs = {
+            "video_folder": os.path.join(log_dir, "videos", "train"),
+            "step_trigger": lambda step: step % args_cli.video_interval == 0,
+            "video_length": args_cli.video_length,
+            "disable_logger": True,
+        }
+        print("[INFO] Recording videos during training.")
+        print_dict(video_kwargs, nesting=4)
+        env = gym.wrappers.RecordVideo(env, **video_kwargs)
+
+    # wrap around environment for rsl-rl
+    env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
+    print("[INFO] Created RslRlVecEnvWrapper.")
+
     print("****** finish createRslRlEnv *******")
 
     # save resume path before creating a new log_dir
@@ -251,7 +278,31 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             agent_cfg.load_checkpoint = recovery_checkpoint
             resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
             
-            env = createRslRlEnv(env_cfg, agent_cfg, log_root_path, log_dir)
+            # env = createRslRlEnv(env_cfg, agent_cfg, log_root_path, log_dir)
+            # create isaac environment
+            env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
+            print("[INFO] Created isaac environment.")
+
+            # convert to single-agent instance if required by the RL algorithm
+            if isinstance(env.unwrapped, DirectMARLEnv):
+                env = multi_agent_to_single_agent(env)
+
+            # wrap for video recording
+            if args_cli.video:
+                video_kwargs = {
+                    "video_folder": os.path.join(log_dir, "videos", "train"),
+                    "step_trigger": lambda step: step % args_cli.video_interval == 0,
+                    "video_length": args_cli.video_length,
+                    "disable_logger": True,
+                }
+                print("[INFO] Recording videos during training.")
+                print_dict(video_kwargs, nesting=4)
+                env = gym.wrappers.RecordVideo(env, **video_kwargs)
+
+            # wrap around environment for rsl-rl
+            env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
+            print("[INFO] Created RslRlVecEnvWrapper.")
+            
             if "normal expects all elements of std >= 0.0" in str(e) or (
                 "value_function" in loss_dict and (loss_dict["value_function"] > value_loss_threshold or 
                                                     torch.isinf(torch.tensor(loss_dict["value_function"])) or 
