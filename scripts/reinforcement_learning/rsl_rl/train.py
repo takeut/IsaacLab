@@ -232,9 +232,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     max_recovery_attempts = 100
     while recovery_attempts > max_recovery_attempts:
         try:
-            print("[INFO] runner.learn.")
             runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True)
-            print("[INFO] finish runner.learn.")
             break
         except RuntimeError as e:
             loss_dict = runner.alg.update()
