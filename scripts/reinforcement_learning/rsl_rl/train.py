@@ -237,7 +237,13 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         except RuntimeError as e:
             loss_dict = runner.alg.update()
             value_loss_threshold = 50
+
             learning_rate_decay_factor = 0.5
+            min_learning_rate = 1e-6 # 0.0005
+            entropy_coef_reduction_factor = 0.0005
+            min_entropy_coef = 0.001 # 0.005
+            value_loss_coef_reduction_factor = 0.005
+            min_value_loss_coef = 0.1 # 0.5
 
             env.close()
             time.sleep(5)
@@ -255,10 +261,26 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                 print("[ERROR] Caught std < 0 error during action sampling.")
                 # 学習率を修正して再試行
                 runner.load(resume_path)
+
                 learning_rate = runner.alg.learning_rate
                 new_learning_rate = learning_rate * learning_rate_decay_factor
+                if new_learning_rate < min_learning_rate:
+                    new_entropy_coef = min_learning_rate
+
+                entropy_coef = runner.alg.entropy_coef
+                new_entropy_coef = entropy_coef - entropy_coef_reduction_factor
+                if new_entropy_coef < min_entropy_coef:
+                    new_entropy_coef = min_entropy_coef
+
+                value_loss_coef = runner.alg.value_loss_coef
+                new_value_loss_coef = value_loss_coef - value_loss_coef_reduction_factor
+                if new_value_loss_coef < min_value_loss_coef:
+                    new_value_loss_coef = min_value_loss_coef
+
                 time.sleep(5)
                 runner.alg.learning_rate = new_learning_rate
+                runner.alg.entropy_coef = new_entropy_coef
+                runner.alg.value_loss_coef = new_value_loss_coef
             else:
                 raise
 

@@ -41,4 +41,4 @@ class UnitreeGo2FlatEnvCfg_PLAY(UnitreeGo2FlatEnvCfg):
         self.observations.policy.enable_corruption = False
         # remove random pushing event
         self.events.base_external_force_torque = None
-        self.events.push_robot = None
+        # self.events.push_robot = None

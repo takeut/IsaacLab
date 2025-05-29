@@ -51,20 +51,20 @@ class UnitreeGo2FlatPPORunnerCfg(UnitreeGo2RoughPPORunnerCfg):
         self.policy.critic_hidden_dims = [128, 128, 128]
 
         # さらに安定した学習のための設定
-        self.policy.init_noise_std = 0.8  # 探索ノイズを少し減らす
-        self.algorithm.value_loss_coef = 0.2  # 値関数の損失係数をさらに小さくする
-        self.algorithm.learning_rate = 0.0003  # 学習率をさらに小さくする
-        self.algorithm.max_grad_norm = 0.8  # 勾配のノルム制限を強化
-        self.algorithm.clip_param = 0.1  # クリッピングパラメータを小さくして更新を安定化
-        self.algorithm.desired_kl = 0.007  # KLダイバージェンスの目標値を小さくする
-        self.algorithm.entropy_coef = 0.01  # エントロピー係数を増やして探索を促進
-        self.empirical_normalization = True  # 経験的正規化を有効にして入力の分布を安定化
+        # self.policy.init_noise_std = 0.8  # 探索ノイズを少し減らす
+        self.algorithm.value_loss_coef = 0.5  # 値関数の損失係数を小さくする
+        # self.algorithm.learning_rate = 0.0003  # 学習率をさらに小さくする
+        # self.algorithm.max_grad_norm = 0.8  # 勾配のノルム制限を強化
+        # self.algorithm.clip_param = 0.1  # クリッピングパラメータを小さくして更新を安定化
+        # self.algorithm.desired_kl = 0.007  # KLダイバージェンスの目標値を小さくする
+        # self.algorithm.entropy_coef = 0.05  # エントロピー係数を減らす
+        # self.empirical_normalization = True  # 経験的正規化を有効にして入力の分布を安定化
         
         # #normal
-        # self.policy.init_noise_std = 1.0
+        self.policy.init_noise_std = 1.0
         # self.algorithm.value_loss_coef = 1.0
         # self.algorithm.learning_rate = 0.001
-        # self.empirical_normalization = False
+        self.empirical_normalization = False
 
         # モーターの遅延をシミュレートするためのアクション遅延ステップの数
         # self.runner.obs_delay_steps = 10
