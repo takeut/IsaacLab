@@ -37,7 +37,6 @@ from isaaclab.app import AppLauncher
 
 # local imports
 import cli_args
-import isaaclab_tasks
 from isaaclab_tasks.utils import get_checkpoint_path
 
 # 必要なモジュールをインポート
