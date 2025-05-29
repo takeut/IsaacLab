@@ -54,7 +54,7 @@ parser.add_argument(
 # mytrain.py固有の引数を追加
 parser.add_argument("--recovery_attempts", type=int, default=10, help="Maximum number of recovery attempts.")
 parser.add_argument("--learning_rate_scale", type=float, default=0.5, help="Learning rate scale factor for recovery.")
-# parser.add_argument("--experiment_name", type=str, default=None, help="Experiment name for recovery.")
+parser.add_argument("--experiment_name", type=str, default=None, help="Experiment name for recovery.")
 
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
