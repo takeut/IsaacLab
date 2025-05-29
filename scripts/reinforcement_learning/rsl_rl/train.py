@@ -236,6 +236,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     max_recovery_attempts = 100
     while recovery_attempts < max_recovery_attempts:
         try:
+            print(f"[INFO] recovery_attempts is {recovery_attempts}.")
             runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True)
             break
         except RuntimeError as e:
@@ -255,9 +256,9 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                 # agent_cfg.load_checkpoint = recovery_checkpoint
                 # resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
                 
-                env.close()
-                time.sleep(5)
-                env = createRslRlEnv(env_cfg, agent_cfg, log_dir)
+                # env.close()
+                # time.sleep(5)
+                # env = createRslRlEnv(env_cfg, agent_cfg, log_dir)
 
                 # 学習率を修正して再試行
                 print(f"[INFO]: Loading model checkpoint from: {resume_path}")
