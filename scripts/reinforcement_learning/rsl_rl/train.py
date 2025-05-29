@@ -205,7 +205,9 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         log_dir += f"_{agent_cfg.run_name}"
     log_dir = os.path.join(log_root_path, log_dir)
 
+    print("****** createRslRlEnv *******")
     env = createRslRlEnv(env_cfg, agent_cfg, log_root_path, log_dir)
+    print("****** finish createRslRlEnv *******")
 
     # save resume path before creating a new log_dir
     if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
