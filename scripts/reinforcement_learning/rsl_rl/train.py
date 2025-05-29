@@ -235,7 +235,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True)
             break
         except RuntimeError as e:
-            loss_dict = runner.alg.update()
+            print("[ERROR] checking action_std: {e}")
+            # loss_dict = runner.alg.update()
             value_loss_threshold = 50
 
             learning_rate_decay_factor = 0.5
@@ -254,10 +255,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
             
             env = createRslRlEnv(env_cfg, agent_cfg, log_dir)
-            if "normal expects all elements of std >= 0.0" in str(e) or (
-                "value_function" in loss_dict and (loss_dict["value_function"] > value_loss_threshold or 
-                                                    torch.isinf(torch.tensor(loss_dict["value_function"])) or 
-                                                    torch.isnan(torch.tensor(loss_dict["value_function"])))):
+            if "normal expects all elements of std >= 0.0" in str(e):
+            # if "normal expects all elements of std >= 0.0" in str(e) or (
+            #     "value_function" in loss_dict and (loss_dict["value_function"] > value_loss_threshold or 
+            #                                         torch.isinf(torch.tensor(loss_dict["value_function"])) or 
+            #                                         torch.isnan(torch.tensor(loss_dict["value_function"])))):
                 print("[ERROR] Caught std < 0 error during action sampling.")
                 # 学習率を修正して再試行
                 runner.load(resume_path)
