@@ -282,6 +282,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     min_entropy_coef = 0.001 # default is 0.005.
     value_loss_coef_reduction_factor = 0.005
     min_value_loss_coef = 0.1 # default is 0.5.
+    new_simulation_app = None
     while recovery_attempts < max_recovery_attempts:
         print(f"[INFO] recovery_attempts is {recovery_attempts}.")
         try:
@@ -302,12 +303,15 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                 # close and launch omniverse app
                 runner.alg.storage.clear()
                 env.close()
-                simulation_app.close()
+                if new_simulation_app is None:
+                    simulation_app.close()
+                else:
+                    new_simulation_app.close()
 
                 time.sleep(10)
 
                 new_app_launcher = AppLauncher(args_cli)
-                simulation_app = new_app_launcher.app
+                new_simulation_app = new_app_launcher.app
 
                 time.sleep(10)
 
