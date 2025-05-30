@@ -42,7 +42,7 @@ if args_cli.video:
 sys.argv = [sys.argv[0]] + hydra_args
 
 # launch omniverse app
-app_launcher = AppLauncher(args_cli)
+app_launcher = AppLaunchercher(args_cli)
 simulation_app = app_launcher.app
 
 """Check for minimum supported RSL-RL version."""
@@ -140,7 +140,7 @@ def setupTrainRslRlAgent(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | Direct
 
     env = createRslRlEnv(env_cfg, agent_cfg, log_dir)
 
-    return log_dir, log_root_path, env
+    return env, log_dir, log_root_path
 
 def createRslRlEnv(env_cfg, agent_cfg, log_dir):
     # create isaac environment
@@ -214,7 +214,6 @@ def get_checkpoint_for_recovery(log_dir) -> str:
 
 @hydra_task_config(args_cli.task, "rsl_rl_cfg_entry_point")
 def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agent_cfg: RslRlOnPolicyRunnerCfg):
-    # log_dir, log_root_path, env = setupTrainRslRlAgent(env_cfg, agent_cfg)
     """Train with RSL-RL agent."""
     # override configurations with non-hydra CLI arguments
     agent_cfg = cli_args.update_rsl_rl_cfg(agent_cfg, args_cli)
@@ -276,6 +275,13 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     recovery_attempts = 0
     max_recovery_attempts = 100
     current_resume_path = ""
+    # value_loss_threshold = 50
+    learning_rate_decay_factor = 0.5
+    min_learning_rate = 1e-6 # default is 0.0005.
+    entropy_coef_reduction_factor = 0.0005
+    min_entropy_coef = 0.001 # default is 0.005.
+    value_loss_coef_reduction_factor = 0.005
+    min_value_loss_coef = 0.1 # default is 0.5.
     while recovery_attempts < max_recovery_attempts:
         print(f"[INFO] recovery_attempts is {recovery_attempts}.")
         try:
@@ -285,63 +291,71 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             print(f"[ERROR] checking action_std: {e}")
             if "normal expects all elements of std >= 0.0" in str(e):
                 print(f"[ERROR] Caught std < 0 error during action sampling.")
-                # value_loss_threshold = 50
-                learning_rate_decay_factor = 0.5
-                min_learning_rate = 1e-6 # default is 0.0005.
-                entropy_coef_reduction_factor = 0.0005
-                min_entropy_coef = 0.001 # default is 0.005.
-                value_loss_coef_reduction_factor = 0.005
-                min_value_loss_coef = 0.1 # default is 0.5.
+
+                current_learning_rate = runner.alg.learning_rate
+                current_entropy_coef = runner.alg.entropy_coef
+                current_value_loss_coef = runner.alg.value_loss_coef
+                print(f"[INFO]: Current learning_rate : {current_learning_rate}: ")
+                print(f"[INFO]: Current entropy_coef : {current_entropy_coef}: ")
+                print(f"[INFO]: Current value_loss_coef : {current_value_loss_coef}: ")
+
+                # close and launch omniverse app
+                runner.alg.storage.clear()
+                env.close()
+                simulation_app.close()
+
+                time.sleep(10)
+
+                new_app_launcher = AppLaunchercher(args_cli)
+                simulation_app = new_app_launcher.app
+
+                time.sleep(10)
+
+                env = createRslRlEnv(env_cfg, agent_cfg, log_dir)
 
                 # get recovery checkpoint
                 resume_path = get_checkpoint_for_recovery(log_dir)
+                load_checkpoint = os.path.basename(resume_path)
+                agent_cfg.resume = True
+                agent_cfg.load_checkpoint = load_checkpoint
                 if current_resume_path == resume_path:
                     print(f"[ERROR]: Loading the same model as the previous one.: {resume_path}")
                     break
-                    
-                # agent_cfg.load_checkpoint = recovery_checkpoint
-                # resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
-                
-                # env.close()
-                # time.sleep(5)
-                # env = createRslRlEnv(env_cfg, agent_cfg, log_dir)
 
-                # 学習率を修正して再試行
-
-                print(f"[INFO]: Current learning_rate : {runner.alg.learning_rate}: ")
-                print(f"[INFO]: Current entropy_coef : {runner.alg.entropy_coef}: ")
-                print(f"[INFO]: Current value_loss_coef : {runner.alg.value_loss_coef}: ")
+                # save resume path before creating a new log_dir
+                if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
+                    resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
+                    print("[INFO] resume checkpoint: {resume_path}")
 
                 print(f"[INFO]: Loading model checkpoint from: {resume_path}")
-                runner.alg.storage.clear()
-                time.sleep(5)
+
                 # create runner from rsl-rl
                 runner = OnPolicyRunner(env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device)
                 # write git state to logs
                 runner.add_git_repo_to_log(__file__)
-                runner.load(resume_path)
+                # load the checkpoint
+                if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
+                    print(f"[INFO]: Loading model checkpoint from: {resume_path}")
+                    # load previously trained model
+                    runner.load(resume_path)
 
-                learning_rate = runner.alg.learning_rate
-                new_learning_rate = learning_rate * learning_rate_decay_factor
+                # 学習率を修正して再試行
+                new_learning_rate = current_learning_rate * learning_rate_decay_factor
                 if new_learning_rate < min_learning_rate:
                     new_entropy_coef = min_learning_rate
-
-                entropy_coef = runner.alg.entropy_coef
-                new_entropy_coef = entropy_coef - entropy_coef_reduction_factor
+                new_entropy_coef = current_entropy_coef - entropy_coef_reduction_factor
                 if new_entropy_coef < min_entropy_coef:
                     new_entropy_coef = min_entropy_coef
-
-                value_loss_coef = runner.alg.value_loss_coef
-                new_value_loss_coef = value_loss_coef - value_loss_coef_reduction_factor
+                new_value_loss_coef = current_value_loss_coef - value_loss_coef_reduction_factor
                 if new_value_loss_coef < min_value_loss_coef:
                     new_value_loss_coef = min_value_loss_coef
 
                 runner.alg.learning_rate = new_learning_rate
                 runner.alg.entropy_coef = new_entropy_coef
                 runner.alg.value_loss_coef = new_value_loss_coef
-                print(f"[INFO]: Change learning_rate from {learning_rate} to {runner.alg.learning_rate}: ")
-                print(f"[INFO]: Change entropy_coef from {entropy_coef} to {runner.alg.entropy_coef}: ")
-                print(f"[INFO]: Change value_loss_coef from {value_loss_coef} to {runner.alg.value_loss_coef}: ")
+                print(f"[INFO]: Change learning_rate from {current_learning_rate} to {runner.alg.learning_rate}: ")
+                print(f"[INFO]: Change entropy_coef from {current_entropy_coef} to {runner.alg.entropy_coef}: ")
+                print(f"[INFO]: Change value_loss_coef from {current_value_loss_coef} to {runner.alg.value_loss_coef}: ")
 
                 recovery_attempts = recovery_attempts + 1
             else:
