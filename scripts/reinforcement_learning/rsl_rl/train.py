@@ -42,7 +42,7 @@ if args_cli.video:
 sys.argv = [sys.argv[0]] + hydra_args
 
 # launch omniverse app
-app_launcher = AppLaunchercher(args_cli)
+app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
 """Check for minimum supported RSL-RL version."""
@@ -306,7 +306,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
                 time.sleep(10)
 
-                new_app_launcher = AppLaunchercher(args_cli)
+                new_app_launcher = AppLauncher(args_cli)
                 simulation_app = new_app_launcher.app
 
                 time.sleep(10)
