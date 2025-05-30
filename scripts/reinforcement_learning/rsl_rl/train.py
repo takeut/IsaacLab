@@ -73,9 +73,6 @@ import gymnasium as gym
 import os
 import torch
 from datetime import datetime
-import time
-import glob
-import re
 
 from rsl_rl.runners import OnPolicyRunner
 
@@ -102,7 +99,9 @@ torch.backends.cudnn.allow_tf32 = True
 torch.backends.cudnn.deterministic = False
 torch.backends.cudnn.benchmark = False
 
-def setupTrainRslRlAgent(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agent_cfg: RslRlOnPolicyRunnerCfg):
+
+@hydra_task_config(args_cli.task, "rsl_rl_cfg_entry_point")
+def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agent_cfg: RslRlOnPolicyRunnerCfg):
     """Train with RSL-RL agent."""
     # override configurations with non-hydra CLI arguments
     agent_cfg = cli_args.update_rsl_rl_cfg(agent_cfg, args_cli)
@@ -138,17 +137,16 @@ def setupTrainRslRlAgent(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | Direct
         log_dir += f"_{agent_cfg.run_name}"
     log_dir = os.path.join(log_root_path, log_dir)
 
-    env = createRslRlEnv(env_cfg, agent_cfg, log_dir)
-
-    return log_dir, log_root_path, env
-
-def createRslRlEnv(env_cfg, agent_cfg, log_dir):
     # create isaac environment
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
 
     # convert to single-agent instance if required by the RL algorithm
     if isinstance(env.unwrapped, DirectMARLEnv):
         env = multi_agent_to_single_agent(env)
+
+    # save resume path before creating a new log_dir
+    if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
+        resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
 
     # wrap for video recording
     if args_cli.video:
@@ -164,97 +162,6 @@ def createRslRlEnv(env_cfg, agent_cfg, log_dir):
 
     # wrap around environment for rsl-rl
     env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
-
-    return env
-
-def find_checkpoints(log_dir) -> list[str]:
-    """ログディレクトリ内のチェックポイントを見つける"""
-    try:
-        # チェックポイントファイルの一覧を取得
-        checkpoint_files = glob.glob(os.path.join(log_dir, "model_*.pt"))
-        
-        if not checkpoint_files:
-            print(f"[WARNING] No checkpoint files found in {log_dir}")
-            return []
-            
-        # チェックポイントファイルをイテレーション番号でソート
-        def get_iteration(filename):
-            match = re.search(r'model_(\d+)\.pt', os.path.basename(filename))
-            if match:
-                return int(match.group(1))
-            return 0
-            
-        sorted_checkpoints = sorted(checkpoint_files, key=get_iteration)
-        print(f"[INFO] Found {len(sorted_checkpoints)} checkpoints in {log_dir}")
-        return sorted_checkpoints
-    except Exception as e:
-        print(f"[WARNING] finding checkpoints: {e}")
-        return []
-
-def get_checkpoint_for_recovery(log_dir) -> str:
-    """回復用のチェックポイントを取得する（最新から2つ前）
-    
-    Returns:
-        The path to the model checkpoint.
-    """
-    checkpoints = find_checkpoints(log_dir)
-    
-    if len(checkpoints) < 3:
-        print(f"[WARNING] Not enough checkpoints for recovery. Found only {len(checkpoints)} checkpoints.")
-        if checkpoints:
-            # 少なくとも1つのチェックポイントがある場合は最も古いものを使用
-            print("[INFO] Using oldest available checkpoint: {checkpoints[0]}")
-            return checkpoints[0]
-        raise ValueError(f"No checkpoints in the directory: '{log_dir}'.")
-    
-    # 最新から2つ前のチェックポイントを取得
-    recovery_checkpoint = checkpoints[-3]
-    print(f"[INFO] Selected recovery checkpoint: {recovery_checkpoint} (3rd newest)")
-    return recovery_checkpoint
-
-@hydra_task_config(args_cli.task, "rsl_rl_cfg_entry_point")
-def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agent_cfg: RslRlOnPolicyRunnerCfg):
-    # log_dir, log_root_path, env = setupTrainRslRlAgent(env_cfg, agent_cfg)
-    """Train with RSL-RL agent."""
-    # override configurations with non-hydra CLI arguments
-    agent_cfg = cli_args.update_rsl_rl_cfg(agent_cfg, args_cli)
-    env_cfg.scene.num_envs = args_cli.num_envs if args_cli.num_envs is not None else env_cfg.scene.num_envs
-    agent_cfg.max_iterations = (
-        args_cli.max_iterations if args_cli.max_iterations is not None else agent_cfg.max_iterations
-    )
-
-    # set the environment seed
-    # note: certain randomizations occur in the environment initialization so we set the seed here
-    env_cfg.seed = agent_cfg.seed
-    env_cfg.sim.device = args_cli.device if args_cli.device is not None else env_cfg.sim.device
-
-    # multi-gpu training configuration
-    if args_cli.distributed:
-        env_cfg.sim.device = f"cuda:{app_launcher.local_rank}"
-        agent_cfg.device = f"cuda:{app_launcher.local_rank}"
-
-        # set seed to have diversity in different threads
-        seed = agent_cfg.seed + app_launcher.local_rank
-        env_cfg.seed = seed
-        agent_cfg.seed = seed
-
-    # specify directory for logging experiments
-    log_root_path = os.path.join("logs", "rsl_rl", agent_cfg.experiment_name)
-    log_root_path = os.path.abspath(log_root_path)
-    print(f"[INFO] Logging experiment in directory: {log_root_path}")
-    # specify directory for logging runs: {time-stamp}_{run_name}
-    log_dir = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    # The Ray Tune workflow extracts experiment name using the logging line below, hence, do not change it (see PR #2346, comment-2819298849)
-    print(f"Exact experiment name requested from command line: {log_dir}")
-    if agent_cfg.run_name:
-        log_dir += f"_{agent_cfg.run_name}"
-    log_dir = os.path.join(log_root_path, log_dir)
-
-    env = createRslRlEnv(env_cfg, agent_cfg, log_dir)
-
-    # save resume path before creating a new log_dir
-    if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
-        resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
 
     # create runner from rsl-rl
     runner = OnPolicyRunner(env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device)
@@ -273,82 +180,9 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     dump_pickle(os.path.join(log_dir, "params", "agent.pkl"), agent_cfg)
 
     # run training
-    recovery_attempts = 0
-    max_recovery_attempts = 100
-    current_resume_path = ""
-    while recovery_attempts < max_recovery_attempts:
-        print(f"[INFO] recovery_attempts is {recovery_attempts}.")
-        try:
-            runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True)
-            break
-        except RuntimeError as e:
-            print(f"[ERROR] checking action_std: {e}")
-            if "normal expects all elements of std >= 0.0" in str(e):
-                print(f"[ERROR] Caught std < 0 error during action sampling.")
-                # value_loss_threshold = 50
-                learning_rate_decay_factor = 0.5
-                min_learning_rate = 1e-6 # default is 0.0005.
-                entropy_coef_reduction_factor = 0.0005
-                min_entropy_coef = 0.001 # default is 0.005.
-                value_loss_coef_reduction_factor = 0.005
-                min_value_loss_coef = 0.1 # default is 0.5.
-
-                # get recovery checkpoint
-                resume_path = get_checkpoint_for_recovery(log_dir)
-                if current_resume_path == resume_path:
-                    print(f"[ERROR]: Loading the same model as the previous one.: {resume_path}")
-                    break
-                    
-                # agent_cfg.load_checkpoint = recovery_checkpoint
-                # resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
-                
-                # env.close()
-                # time.sleep(5)
-                # env = createRslRlEnv(env_cfg, agent_cfg, log_dir)
-
-                # 学習率を修正して再試行
-
-                print(f"[INFO]: Current learning_rate : {runner.alg.learning_rate}: ")
-                print(f"[INFO]: Current entropy_coef : {runner.alg.entropy_coef}: ")
-                print(f"[INFO]: Current value_loss_coef : {runner.alg.value_loss_coef}: ")
-
-                print(f"[INFO]: Loading model checkpoint from: {resume_path}")
-                runner.alg.storage.clear()
-                time.sleep(5)
-                # create runner from rsl-rl
-                runner = OnPolicyRunner(env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device)
-                # write git state to logs
-                runner.add_git_repo_to_log(__file__)
-                runner.load(resume_path)
-
-                learning_rate = runner.alg.learning_rate
-                new_learning_rate = learning_rate * learning_rate_decay_factor
-                if new_learning_rate < min_learning_rate:
-                    new_entropy_coef = min_learning_rate
-
-                entropy_coef = runner.alg.entropy_coef
-                new_entropy_coef = entropy_coef - entropy_coef_reduction_factor
-                if new_entropy_coef < min_entropy_coef:
-                    new_entropy_coef = min_entropy_coef
-
-                value_loss_coef = runner.alg.value_loss_coef
-                new_value_loss_coef = value_loss_coef - value_loss_coef_reduction_factor
-                if new_value_loss_coef < min_value_loss_coef:
-                    new_value_loss_coef = min_value_loss_coef
-
-                runner.alg.learning_rate = new_learning_rate
-                runner.alg.entropy_coef = new_entropy_coef
-                runner.alg.value_loss_coef = new_value_loss_coef
-                print(f"[INFO]: Change learning_rate from {learning_rate} to {runner.alg.learning_rate}: ")
-                print(f"[INFO]: Change entropy_coef from {entropy_coef} to {runner.alg.entropy_coef}: ")
-                print(f"[INFO]: Change value_loss_coef from {value_loss_coef} to {runner.alg.value_loss_coef}: ")
-
-                recovery_attempts = recovery_attempts + 1
-            else:
-                raise
+    runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True)
 
     # close the simulator
-    print(f"[INFO] close the simulator.")
     env.close()
 
 
