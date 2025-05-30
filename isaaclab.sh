@@ -360,10 +360,23 @@ while [[ $# -gt 0 ]]; do
         -p|--python)
             # run the python provided by isaacsim
             python_exe=$(extract_python_exe)
-            echo "[INFO] Using python from: ${python_exe}"
             shift # past argument
-            ${python_exe} "$@"
-            # exit neatly
+            for i in {0..10} ; do
+                if [i -eq 0]; then
+                    echo "[INFO] Using python from: ${python_exe}"
+                    output=$(${python_exe} "$@" 2>&1)
+                else
+                    recovery_args=("$@")
+                    recovery_args+=("--recovery_attempts" "$i")
+                    echo "[INFO] Using python from: ${python_exe} ${recovery_args[@]}"
+                    ${python_exe} "${recovery_args[@]}"
+                fi
+                if echo "$output" | grep -q "normal expects all elements of std >= 0.0"; then
+                    echo "[ERROR] std に負の値が含まれています"
+                else
+                    break
+                fi
+            done
             break
             ;;
         -s|--sim)
