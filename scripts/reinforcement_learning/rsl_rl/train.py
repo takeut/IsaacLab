@@ -286,6 +286,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     while recovery_attempts < max_recovery_attempts:
         print(f"[INFO] recovery_attempts is {recovery_attempts}.")
         try:
+            raise RuntimeError("normal expects all elements of std >= 0.0")
             runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True)
             break
         except RuntimeError as e:
