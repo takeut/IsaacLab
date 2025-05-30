@@ -304,19 +304,24 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                 # close and launch omniverse app
                 runner.alg.storage.clear()
                 env.close()
+                print(f"[INFO]: env closed")
                 if new_simulation_app is None:
                     simulation_app.close()
+                    print(f"[INFO]: simulation_app closed")
                 else:
                     new_simulation_app.close()
+                    print(f"[INFO]: new_simulation_app closed")
 
                 time.sleep(10)
 
                 new_app_launcher = AppLauncher(args_cli)
                 new_simulation_app = new_app_launcher.app
+                print(f"[INFO]: created new_simulation_app")
 
                 time.sleep(10)
 
                 env = createRslRlEnv(env_cfg, agent_cfg, log_dir)
+                print(f"[INFO]: created env")
 
                 # get recovery checkpoint
                 resume_path = get_checkpoint_for_recovery(log_dir)
