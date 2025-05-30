@@ -327,7 +327,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     except RuntimeError as e:
         print(f"[ERROR] checking action_std: {e}")
         if "normal expects all elements of std >= 0.0" in str(e):
-            print(f"[ERROR] close the simulator. for normal expects all elements of std >= 0.0")
+            print(f"[ERROR] close the simulator.")
             env.close()
             simulation_app.close()
             return 0

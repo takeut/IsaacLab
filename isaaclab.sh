@@ -362,7 +362,7 @@ while [[ $# -gt 0 ]]; do
             python_exe=$(extract_python_exe)
             shift # past argument
             for i in {0..10} ; do
-                if [$i -eq 0]; then
+                if [ $i -eq 0 ]; then
                     echo "[INFO] Using python from: ${python_exe}"
                     output=$(${python_exe} "$@" 2>&1)
                 else
