@@ -321,8 +321,18 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     dump_pickle(os.path.join(log_dir, "params", "env.pkl"), env_cfg)
     dump_pickle(os.path.join(log_dir, "params", "agent.pkl"), agent_cfg)
 
-    raise RuntimeError("normal expects all elements of std >= 0.0")
-    runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True)
+    try: 
+        raise RuntimeError("normal expects all elements of std >= 0.0")
+        runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True)
+    except RuntimeError as e:
+        print(f"[ERROR] checking action_std: {e}")
+        if "normal expects all elements of std >= 0.0" in str(e):
+            print(f"[INFO] close the simulator.")
+            env.close()
+            simulation_app.close()
+            return 0
+        else:
+            raise
     # while recovery_attempts < max_recovery_attempts:
     #     print(f"[INFO] recovery_attempts is {recovery_attempts}.")
     #     try:
