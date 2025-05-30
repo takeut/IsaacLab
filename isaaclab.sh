@@ -369,7 +369,7 @@ while [[ $# -gt 0 ]]; do
                     recovery_args=("$@")
                     recovery_args+=("--recovery_attempts" "$i")
                     echo "[INFO] Using python from: ${python_exe} ${recovery_args[@]}"
-                    output=$(${python_exe} "${recovery_args[@]}")
+                    output=$(${python_exe} "${recovery_args[@]}" 2>&1)
                 fi
                 exit_code=$?
 
