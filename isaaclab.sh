@@ -364,12 +364,12 @@ while [[ $# -gt 0 ]]; do
             for i in {0..10} ; do
                 if [ $i -eq 0 ]; then
                     echo "[INFO] Using python from: ${python_exe}"
-                    output=$(${python_exe} "$@" 2>&1)
+                    output=$(${python_exe} "$@" 2>&1 | tee /dev/tty)
                 else
                     recovery_args=("$@")
                     recovery_args+=("--recovery_attempts" "$i")
                     echo "[INFO] Using python from: ${python_exe} ${recovery_args[@]}"
-                    output=$(${python_exe} "${recovery_args[@]}" 2>&1)
+                    output=$(${python_exe} "${recovery_args[@]}" 2>&1 | tee /dev/tty)
                 fi
                 exit_code=$?
 

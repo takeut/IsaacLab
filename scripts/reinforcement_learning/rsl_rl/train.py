@@ -325,9 +325,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         raise RuntimeError("normal expects all elements of std >= 0.0")
         runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True)
     except RuntimeError as e:
-        print(f"[ERROR] checking action_std: {e}")
+        print(f"[ERROR] checking action_std: {e}", flush=True)
         if "normal expects all elements of std >= 0.0" in str(e):
-            print(f"[ERROR] close the simulator.")
+            print(f"[ERROR] close the simulator.", flush=True)
+            sys.stdout.flush()
             env.close()
             simulation_app.close()
             return 0
