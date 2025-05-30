@@ -243,6 +243,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     if recovery_attempts != 0:
         latest_log_dir = findLatestLogDir("logs/rsl_rl", agent_cfg.experiment_name)
         log_dir = latest_log_dir if latest_log_dir is not None else log_dir
+        print(f"Exact experiment name requested from command line: {log_dir}")
 
     # env = createRslRlEnv(env_cfg, agent_cfg, log_dir)
     # create isaac environment
