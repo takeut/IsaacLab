@@ -362,14 +362,19 @@ while [[ $# -gt 0 ]]; do
             python_exe=$(extract_python_exe)
             shift # past argument
             for i in {0..10} ; do
+                tmpfile=$(mktemp)
                 if [ $i -eq 0 ]; then
                     echo "[INFO] Using python from: ${python_exe}"
-                    output=$(${python_exe} "$@" 2>&1 | tee /dev/tty)
+                    ${python_exe} "$@" 2>&1 | tee "$tmpfile"
+                    output=$(<"$tmpfile")
+                    rm "$tmpfile"
                 else
                     recovery_args=("$@")
                     recovery_args+=("--recovery_attempts" "$i")
                     echo "[INFO] Using python from: ${python_exe} ${recovery_args[@]}"
-                    output=$(${python_exe} "${recovery_args[@]}" 2>&1 | tee /dev/tty)
+                    ${python_exe} "${recovery_args[@]}" 2>&1 | tee "$tmpfile"
+                    output=$(<"$tmpfile")
+                    rm "$tmpfile"
                 fi
                 exit_code=$?
 
