@@ -371,9 +371,14 @@ while [[ $# -gt 0 ]]; do
                     echo "[INFO] Using python from: ${python_exe} ${recovery_args[@]}"
                     ${python_exe} "${recovery_args[@]}"
                 fi
+                exit_code=$?
+
                 if echo "$output" | grep -q "normal expects all elements of std >= 0.0"; then
                     echo "[ERROR] std に負の値が含まれています"
+                elif [ $exit_code -ne 0 ]; then
+                    echo "[WARNING] エラーで終了しました。"
                 else
+                    echo "[INFO] 正常に終了しました。"
                     break
                 fi
             done
