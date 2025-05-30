@@ -128,7 +128,36 @@ def createRslRlEnv(env_cfg, agent_cfg, log_dir):
 
     return env
 
-def find_checkpoints(log_dir) -> list[str]:
+def findLatestLogDir(base_path = "logs/rsl_rl", experiment_name = None) -> str | None:
+    """最新のログディレクトリを見つける"""
+    try:
+        # 実験名が指定されている場合は、その実験のディレクトリを使用
+        if experiment_name:
+            experiment_path = os.path.join(base_path, experiment_name)
+            if not os.path.exists(experiment_path):
+                print(f"[WARNING] Experiment directory {experiment_path} does not exist")
+                return None
+            base_path = experiment_path
+        
+        # ログディレクトリの一覧を取得
+        log_dirs = glob.glob(os.path.join(base_path, "*"))
+        
+        # ディレクトリのみをフィルタリング
+        log_dirs = [d for d in log_dirs if os.path.isdir(d)]
+        
+        if not log_dirs:
+            print(f"[WARNING] No log directories found in {base_path}")
+            return None
+            
+        # 最新のログディレクトリを返す
+        latest_log_dir = max(log_dirs, key=os.path.getmtime)
+        print(f"[INFO] Found latest log directory: {latest_log_dir}")
+        return latest_log_dir
+    except Exception as e:
+        print(f"[ERROR] Error finding latest log directory: {e}")
+        return None
+
+def findCheckpoints(log_dir) -> list[str]:
     """ログディレクトリ内のチェックポイントを見つける"""
     try:
         # チェックポイントファイルの一覧を取得
@@ -152,13 +181,13 @@ def find_checkpoints(log_dir) -> list[str]:
         print(f"[WARNING] finding checkpoints: {e}")
         return []
 
-def get_checkpoint_for_recovery(log_dir) -> str:
+def getCheckpointForRecovery(log_dir) -> str:
     """回復用のチェックポイントを取得する（最新から2つ前）
     
     Returns:
         The path to the model checkpoint.
     """
-    checkpoints = find_checkpoints(log_dir)
+    checkpoints = findCheckpoints(log_dir)
     
     if len(checkpoints) < 3:
         print(f"[WARNING] Not enough checkpoints for recovery. Found only {len(checkpoints)} checkpoints.")
@@ -210,6 +239,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         log_dir += f"_{agent_cfg.run_name}"
     log_dir = os.path.join(log_root_path, log_dir)
 
+    recovery_attempts = args_cli.recovery_attempts
+    if recovery_attempts != 0:
+        latest_log_dir = findLatestLogDir("logs/rsl_rl", agent_cfg.experiment_name)
+        log_dir = latest_log_dir if latest_log_dir is not None else log_dir
+
     # env = createRslRlEnv(env_cfg, agent_cfg, log_dir)
     # create isaac environment
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
@@ -244,9 +278,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     min_entropy_coef = 0.001 # default is 0.005.
     value_loss_coef_reduction_factor = 0.005
     min_value_loss_coef = 0.1 # default is 0.5.
-    recovery_attempts = args_cli.recovery_attempts
     if recovery_attempts != 0:
-        resume_path = get_checkpoint_for_recovery(log_dir)
+        resume_path = getCheckpointForRecovery(log_dir)
         load_checkpoint = os.path.basename(resume_path)
         agent_cfg.resume = True
         agent_cfg.load_checkpoint = load_checkpoint
