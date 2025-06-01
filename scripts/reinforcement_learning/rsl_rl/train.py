@@ -274,11 +274,13 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # 回復条件の定義
     learning_rate_decay_factor = 0.5
-    min_learning_rate = 1e-6 # default is 0.0005.
+    min_learning_rate = 1e-8 # default is 0.0005.
     entropy_coef_reduction_factor = 0.0005
-    min_entropy_coef = 0.001 # default is 0.005.
-    value_loss_coef_reduction_factor = 0.005
-    min_value_loss_coef = 0.1 # default is 0.5.
+    min_entropy_coef = 0.00001 # default is 0.005.
+    value_loss_coef_reduction_factor = 0.05
+    min_value_loss_coef = 0.001 # default is 0.5.
+    clip_param_reduction_factor = 0.02
+    min_clip_param = 0.001 # default is 0.2.
     if recovery_attempts != 0:
         resume_path = getCheckpointForRecovery(log_dir)
         load_checkpoint = os.path.basename(resume_path)
@@ -301,15 +303,19 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         current_learning_rate = runner.alg.learning_rate
         current_entropy_coef = runner.alg.entropy_coef
         current_value_loss_coef = runner.alg.value_loss_coef
+        current_clip_param = runner.alg.clip_param
 
         new_learning_rate = current_learning_rate
         new_entropy_coef = current_entropy_coef
         new_value_loss_coef = current_value_loss_coef
+        new_clip_param = current_clip_param
 
+        # load時は初期値に戻るので、recovery_attempts 回数だけ値を小さくする計算を行う
         for i in range(recovery_attempts):
             new_learning_rate *= learning_rate_decay_factor
             new_entropy_coef -= entropy_coef_reduction_factor
             new_value_loss_coef -= value_loss_coef_reduction_factor
+            new_clip_param -= clip_param_reduction_factor
 
         if new_learning_rate < min_learning_rate:
             new_entropy_coef = min_learning_rate
@@ -317,14 +323,18 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             new_entropy_coef = min_entropy_coef
         if new_value_loss_coef < min_value_loss_coef:
             new_value_loss_coef = min_value_loss_coef
+        if new_clip_param < min_clip_param:
+            new_clip_param = min_clip_param
 
         runner.alg.learning_rate = new_learning_rate
         runner.alg.entropy_coef = new_entropy_coef
         runner.alg.value_loss_coef = new_value_loss_coef
+        runner.alg.clip_param = new_clip_param
 
         print(f"[INFO]: Change learning_rate from {current_learning_rate} to {runner.alg.learning_rate}: ")
         print(f"[INFO]: Change entropy_coef from {current_entropy_coef} to {runner.alg.entropy_coef}: ")
         print(f"[INFO]: Change value_loss_coef from {current_value_loss_coef} to {runner.alg.value_loss_coef}: ")
+        print(f"[INFO]: Change clip_param from {current_clip_param} to {runner.alg.clip_param}: ")
 
     # dump the configuration into log-directory
     dump_yaml(os.path.join(log_dir, "params", "env.yaml"), env_cfg)
