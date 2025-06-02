@@ -19,7 +19,7 @@ Reference: https://github.com/unitreerobotics/unitree_ros
 """
 
 import isaaclab.sim as sim_utils
-from isaaclab.actuators import ActuatorNetMLPCfg, DCMotorCfg, DelayedDCMotorCfg, ImplicitActuatorCfg
+from isaaclab.actuators import ActuatorNetMLPCfg, DCMotorCfg, DelayedDCMotorCfg, ImplicitActuatorCfg, DelayedActuatorNetMLPCfg
 from isaaclab.assets.articulation import ArticulationCfg
 from isaaclab.utils.assets import ISAACLAB_NUCLEUS_DIR
 
@@ -45,6 +45,26 @@ Actuator specifications: https://shop.unitree.com/products/go1-motor
 
 This model is taken from: https://github.com/Improbable-AI/walk-these-ways
 """
+
+GO2_ACTUATOR_CFG = DelayedActuatorNetMLPCfg(
+    joint_names_expr=[".*_hip_joint", ".*_thigh_joint", ".*_calf_joint"],
+    network_file=f"{ISAACLAB_NUCLEUS_DIR}/ActuatorNets/Unitree/unitree_go1.pt",
+    pos_scale=-1.0,
+    vel_scale=1.0,
+    torque_scale=1.0,
+    input_order="pos_vel",
+    input_idx=[0, 1, 2],
+    effort_limit=23.7,  # taken from spec sheet
+    velocity_limit=30.0,  # taken from spec sheet
+    saturation_effort=23.7,  # same as effort limit
+)
+"""Configuration of Go1 actuators using MLP model.
+
+Actuator specifications: https://shop.unitree.com/products/go1-motor
+
+This model is taken from: https://github.com/Improbable-AI/walk-these-ways
+"""
+
 
 
 ##
@@ -165,15 +185,16 @@ UNITREE_GO2_CFG = ArticulationCfg(
     ),
     soft_joint_pos_limit_factor=0.9,
     actuators={
-        "base_legs": DelayedDCMotorCfg(
-            joint_names_expr=[".*_hip_joint", ".*_thigh_joint", ".*_calf_joint"],
-            effort_limit=23.5,
-            saturation_effort=23.5,
-            velocity_limit=30.0,
-            stiffness=25.0,
-            damping=0.5,
-            friction=0.0,
-        ),
+        "base_legs": GO2_ACTUATOR_CFG,
+        # "base_legs": DelayedDCMotorCfg(
+        #     joint_names_expr=[".*_hip_joint", ".*_thigh_joint", ".*_calf_joint"],
+        #     effort_limit=23.5,
+        #     saturation_effort=23.5,
+        #     velocity_limit=30.0,
+        #     stiffness=25.0,
+        #     damping=0.5,
+        #     friction=0.0,
+        # ),
     },
 )
 """Configuration of Unitree Go2 using DC-Motor actuator model."""

@@ -168,10 +168,11 @@ class EventCfg:
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names=".*"),
+            # Go1ガイドの推奨ドメインランダマイゼーション範囲
             # "static_friction_range": (0.8, 0.8),
             # "dynamic_friction_range": (0.6, 0.6),
-            "static_friction_range": (0.6, 1.2),
-            "dynamic_friction_range": (0.6, 1.2),
+            "static_friction_range": (0.6, 1.2),  # Go1ガイド推奨値
+            "dynamic_friction_range": (0.4, 1.0),  # Go1ガイド推奨値
             "restitution_range": (0.0, 0.0),
             "num_buckets": 64,
         },
@@ -263,7 +264,8 @@ class RewardsCfg:
     # -- penalties
     lin_vel_z_l2 = RewTerm(func=mdp.lin_vel_z_l2, weight=-2.0)
     ang_vel_xy_l2 = RewTerm(func=mdp.ang_vel_xy_l2, weight=-0.05)
-    base_height_l2 = RewTerm(func=mdp.base_height_l2, weight = -30.0, params={"target_height": 0.3},)
+    # base_height_l2 = RewTerm(func=mdp.base_height_l2, weight = -30.0, params={"target_height": 0.3},)
+    base_height_l2 = RewTerm(func=mdp.base_height_l2, weight = -30.0, params={"target_height": 0.32},)  # Go2用に高さを調整
     dof_torques_l2 = RewTerm(func=mdp.joint_torques_l2, weight=-1.0e-5)
     dof_acc_l2 = RewTerm(func=mdp.joint_acc_l2, weight=-2.5e-7)
     action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.01)

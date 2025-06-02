@@ -130,8 +130,20 @@ class JointAction(ActionTerm):
     def process_actions(self, actions: torch.Tensor):
         # store the raw actions
         self._raw_actions[:] = actions
-        # apply the affine transformations
-        self._processed_actions = self._raw_actions * self._scale + self._offset
+        
+        # Go1ガイドの最適化: hip関節の動きを制限してからoffsetを適用
+        scaled_actions = self._raw_actions * self._scale
+        
+        # hip関節のインデックスを特定し、動きを半分に制限
+        if hasattr(self, '_joint_names'):
+            hip_indices = [i for i, name in enumerate(self._joint_names) if 'hip' in name.lower()]
+            if hip_indices:
+                hip_scale_reduction = 0.5
+                scaled_actions[:, hip_indices] *= hip_scale_reduction
+        
+        # offsetを適用
+        self._processed_actions = scaled_actions + self._offset
+        
         # clip actions
         if self.cfg.clip is not None:
             self._processed_actions = torch.clamp(

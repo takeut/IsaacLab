@@ -11,7 +11,7 @@ from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlPpoActorCriticCfg, R
 @configclass
 class UnitreeGo2RoughPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
-    max_iterations = 100000
+    max_iterations = 1000000  # Go1ガイドの推奨値（長期学習）
     save_interval = 50
     experiment_name = "unitree_go2_rough"
     empirical_normalization = False

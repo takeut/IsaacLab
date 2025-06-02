@@ -62,10 +62,16 @@ class UnitreeGo2RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         # self.rewards.undesired_contacts = None
 
         # reward for move
-        self.rewards.dof_torques_l2.weight = -0.0002  # from -1.0e-5. 関節トルクの使用に対するペナルティを強化
-        self.rewards.track_lin_vel_xy_exp.weight = 1.5  # from 1.0. 線形速度の追跡報酬を強化（前後左右の歩行性能向上）
-        self.rewards.track_ang_vel_z_exp.weight = 0.75  # form 0.5. 角速度の追跡報酬を強化（回転性能向上）
-        self.rewards.dof_acc_l2.weight = -2.8e-7  # from -2.5e-7. より滑らかな加速を可能に, 急激な動作変化を抑制しつつ、必要な動作は許容
+        # self.rewards.dof_torques_l2.weight = -0.0002  # from -1.0e-5. 関節トルクの使用に対するペナルティを強化
+        # self.rewards.track_lin_vel_xy_exp.weight = 1.5  # from 1.0. 線形速度の追跡報酬を強化（前後左右の歩行性能向上）
+        # self.rewards.track_ang_vel_z_exp.weight = 0.75  # form 0.5. 角速度の追跡報酬を強化（回転性能向上）
+        # self.rewards.dof_acc_l2.weight = -2.8e-7  # from -2.5e-7. より滑らかな加速を可能に, 急激な動作変化を抑制しつつ、必要な動作は許容
+
+        # reward for move (Go1ガイドの最適化された値を適用)
+        self.rewards.dof_torques_l2.weight = -1.0e-5  # Go1ガイドの推奨値
+        self.rewards.track_lin_vel_xy_exp.weight = 2.0  # Go1ガイドの最適値（コマンド追従性向上）
+        self.rewards.track_ang_vel_z_exp.weight = 1.0  # Go1ガイドの最適値（回転性能向上）
+        self.rewards.dof_acc_l2.weight = -2.5e-7  # Go1ガイドの推奨値（滑らかな動作）
 
         # terminations
         self.terminations.base_contact.params["sensor_cfg"].body_names = "base"
