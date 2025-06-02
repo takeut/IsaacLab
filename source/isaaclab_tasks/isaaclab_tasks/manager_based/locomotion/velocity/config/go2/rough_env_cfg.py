@@ -53,10 +53,10 @@ class UnitreeGo2RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
 
         # rewards for feet - 足を上げるための報酬を調整
         self.rewards.feet_air_time.params["sensor_cfg"].body_names = ".*_foot"
-        # self.rewards.feet_air_time.weight = 0.00001  # 少し有効化して足が空中にある時間を増やす
-        # self.rewards.feet_clearance.weight = 0.00001  # 少し有効化して足のクリアランスを増やす
-        self.rewards.feet_air_time.weight = 0  # 無効化
-        self.rewards.feet_clearance.weight = 0  # 無効化
+        self.rewards.feet_air_time.weight = 0.0001  # 少し有効化して足が空中にある時間を増やす
+        self.rewards.feet_clearance.weight = 0.0001  # 少し有効化して足のクリアランスを増やす
+        # self.rewards.feet_air_time.weight = 0  # 無効化
+        # self.rewards.feet_clearance.weight = 0  # 無効化
         self.rewards.feet_clearance.params["threshold"] = 0.5  # しきい値を上げて足をより高く上げるよう促す
 
         # self.rewards.undesired_contacts = None
@@ -71,7 +71,7 @@ class UnitreeGo2RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.terminations.base_contact.params["sensor_cfg"].body_names = "base"
 
         # reward for stability
-        self.rewards.base_height_l2.weight = -60.0 # from -30.0. 
+        self.rewards.base_height_l2.weight = -40.0 # from -30.0. 
         self.rewards.flat_orientation_l2.weight = -1.0  # 平らな姿勢を維持するためのペナルティを強化
         # self.rewards.ang_vel_xy_l2.weight = -0.05  # 
         # self.rewards.joint_pos_limits.weight = -10.0  # 
