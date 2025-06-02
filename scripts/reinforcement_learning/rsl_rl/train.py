@@ -274,12 +274,15 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # 回復条件の定義
     learning_rate_decay_factor = 0.5
-    min_learning_rate = 1e-8 # default is 0.0005.
-    entropy_coef_reduction_factor = 0.0005
-    min_entropy_coef = 0.00001 # default is 0.005.
-    value_loss_coef_reduction_factor = 0.05
-    min_value_loss_coef = 0.001 # default is 0.5.
+    min_learning_rate = 1e-9 # default is 0.0005.
+    # entropy_coef_reduction_factor = 0.0005
+    entropy_coef_decay_factor = 0.5
+    min_entropy_coef = 0.000001 # default is 0.005.
+    # value_loss_coef_reduction_factor = 0.05
+    value_loss_coef_decay_factor = 0.5
+    min_value_loss_coef = 0.00001 # default is 0.5.
     clip_param_reduction_factor = 0.02
+    # clip_param_decay_factor = 0.5
     min_clip_param = 0.001 # default is 0.2.
     if recovery_attempts != 0:
         resume_path = getCheckpointForRecovery(log_dir)
@@ -313,8 +316,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         # load時は初期値に戻るので、recovery_attempts 回数だけ値を小さくする計算を行う
         for i in range(recovery_attempts):
             new_learning_rate *= learning_rate_decay_factor
-            new_entropy_coef -= entropy_coef_reduction_factor
-            new_value_loss_coef -= value_loss_coef_reduction_factor
+            # new_entropy_coef -= entropy_coef_reduction_factor
+            new_entropy_coef *= entropy_coef_decay_factor
+            # new_value_loss_coef -= value_loss_coef_reduction_factor
+            new_value_loss_coef *= value_loss_coef_decay_factor
             new_clip_param -= clip_param_reduction_factor
 
         if new_learning_rate < min_learning_rate:
