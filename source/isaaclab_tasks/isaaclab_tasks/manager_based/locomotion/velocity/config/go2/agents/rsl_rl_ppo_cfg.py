@@ -20,6 +20,12 @@ class UnitreeGo2RoughPPORunnerCfg(RslRlOnPolicyRunnerCfg):
         actor_hidden_dims=[512, 256, 128],
         critic_hidden_dims=[512, 256, 128],
         activation="elu",
+        # Teacher-Student PPO用パラメータ (Go1ガイド準拠)
+        # これらのパラメータはTeacher-Student構造を有効にする場合に使用
+        adaptation_module_branch_hidden_dims=[[256, 32]],  # Student用
+        env_factor_encoder_branch_input_dims=[4],  # Teacher用特権情報の次元
+        env_factor_encoder_branch_latent_dims=[8],  # エンコード後の次元
+        env_factor_encoder_branch_hidden_dims=[[256, 128]],  # Teacher用エンコーダー
     )
     algorithm = RslRlPpoAlgorithmCfg(
         value_loss_coef=1.0,
@@ -47,8 +53,8 @@ class UnitreeGo2FlatPPORunnerCfg(UnitreeGo2RoughPPORunnerCfg):
 
         self.max_iterations = 100000
         self.experiment_name = "unitree_go2_flat"
-        self.policy.actor_hidden_dims = [128, 128, 128]
-        self.policy.critic_hidden_dims = [128, 128, 128]
+        # self.policy.actor_hidden_dims = [128, 128, 128]
+        # self.policy.critic_hidden_dims = [128, 128, 128]
 
         # さらに安定した学習のための設定
         # self.policy.init_noise_std = 0.8  # 探索ノイズを少し減らす
