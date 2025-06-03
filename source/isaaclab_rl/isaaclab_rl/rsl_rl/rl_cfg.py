@@ -41,6 +41,19 @@ class RslRlPpoActorCriticCfg:
     activation: str = MISSING
     """The activation function for the actor and critic networks."""
 
+    # Teacher-Student PPO用パラメータ (Go1ガイド準拠)
+    adaptation_module_branch_hidden_dims: list[list[int]] | None = None
+    """Student用Adaptation Moduleの隠れ層次元. 例: [[256, 32]]"""
+    
+    env_factor_encoder_branch_input_dims: list[int] | None = None
+    """Teacher用Environment Factor Encoderの入力次元. 例: [4] (特権情報の次元)"""
+    
+    env_factor_encoder_branch_latent_dims: list[int] | None = None
+    """Teacher用Environment Factor Encoderの潜在次元. 例: [8] (エンコード後の次元)"""
+    
+    env_factor_encoder_branch_hidden_dims: list[list[int]] | None = None
+    """Teacher用Environment Factor Encoderの隠れ層次元. 例: [[256, 128]]"""
+
 
 @configclass
 class RslRlPpoActorCriticRecurrentCfg(RslRlPpoActorCriticCfg):
