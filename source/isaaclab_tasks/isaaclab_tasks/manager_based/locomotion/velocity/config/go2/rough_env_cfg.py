@@ -67,9 +67,9 @@ class UnitreeGo2RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         # self.rewards.track_ang_vel_z_exp.weight = 0.75  # form 0.5. 角速度の追跡報酬を強化（回転性能向上）
         # self.rewards.dof_acc_l2.weight = -2.8e-7  # from -2.5e-7. より滑らかな加速を可能に, 急激な動作変化を抑制しつつ、必要な動作は許容
 
-        # reward for move (Go1ガイドの最適化された値を適用)
+        # reward for move (Go1ガイドの最適化された値を適用 + 方向性バイアス除去)
         self.rewards.dof_torques_l2.weight = -1.0e-5  # Go1ガイドの推奨値
-        self.rewards.track_lin_vel_xy_exp.weight = 2.0  # Go1ガイドの最適値（コマンド追従性向上）
+        self.rewards.track_lin_vel_xy_exp.weight = 2.5  # 後ろ向き・右向き歩行改善のため増強
         self.rewards.track_ang_vel_z_exp.weight = 1.0  # Go1ガイドの最適値（回転性能向上）
         self.rewards.dof_acc_l2.weight = -2.5e-7  # Go1ガイドの推奨値（滑らかな動作）
 
@@ -84,9 +84,13 @@ class UnitreeGo2RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
 
         # base_velocity
         # self.commands.base_velocity.ranges.lin_vel_x = (-1.0, 1.0)
-        self.commands.base_velocity.ranges.lin_vel_y = (-0.5, 0.5)
+        # self.commands.base_velocity.ranges.lin_vel_y = (-0.5, 0.5)
         # self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
         # self.commands.base_velocity.rel_standing_envs = 0.1
+        # base_velocity - 後ろ向き・右向き歩行を改善するための設定
+        self.commands.base_velocity.ranges.lin_vel_x = (-1.5, 1.0)  # 後ろ向き歩行を有効化
+        self.commands.base_velocity.ranges.lin_vel_y = (-1.0, 0.5)  # 右向き歩行を有効化
+        self.commands.base_velocity.rel_standing_envs = 0.1  # ロボット自身の向きに依存した速度コマンド割合を増やす
 
         # self.events.add_base_mass.params["mass_distribution_params"] = (-1.0, 3.0)
         # self.events.physics_material.static_friction_range = (0.6, 1.0)
