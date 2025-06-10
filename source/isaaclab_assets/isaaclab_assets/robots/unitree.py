@@ -185,16 +185,16 @@ UNITREE_GO2_CFG = ArticulationCfg(
     ),
     soft_joint_pos_limit_factor=0.9,
     actuators={
-        "base_legs": GO2_ACTUATOR_CFG,
-        # "base_legs": DelayedDCMotorCfg(
-        #     joint_names_expr=[".*_hip_joint", ".*_thigh_joint", ".*_calf_joint"],
-        #     effort_limit=23.5,
-        #     saturation_effort=23.5,
-        #     velocity_limit=30.0,
-        #     stiffness=25.0,
-        #     damping=0.5,
-        #     friction=0.0,
-        # ),
+        # "base_legs": GO2_ACTUATOR_CFG,
+        "base_legs": DelayedDCMotorCfg(
+            joint_names_expr=[".*_hip_joint", ".*_thigh_joint", ".*_calf_joint"],
+            effort_limit=23.5,
+            saturation_effort=23.5,
+            velocity_limit=30.0,
+            stiffness=25.0,
+            damping=0.5,
+            friction=0.1,
+        ),
     },
 )
 """Configuration of Unitree Go2 using DC-Motor actuator model."""

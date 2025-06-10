@@ -53,11 +53,11 @@ class UnitreeGo2RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
 
         # rewards for feet - 足を上げるための報酬を調整
         self.rewards.feet_air_time.params["sensor_cfg"].body_names = ".*_foot"
-        self.rewards.feet_air_time.weight = 0.01  # 少し有効化して足が空中にある時間を増やす
-        self.rewards.feet_clearance.weight = 1.0  # 有効化して足のクリアランスを増やす
-        # self.rewards.feet_air_time.weight = 0  # 無効化
+        # self.rewards.feet_air_time.weight = 0.01  # 少し有効化して足が空中にある時間を増やす
+        # self.rewards.feet_clearance.weight = 1.0  # 有効化して足のクリアランスを増やす
+        self.rewards.feet_air_time.weight = 0  # 無効化
         # self.rewards.feet_clearance.weight = 0  # 無効化
-        self.rewards.feet_clearance.params["threshold"] = 0.5  # しきい値を上げて足をより高く上げるよう促す
+        self.rewards.feet_clearance.params["threshold"] = 1  # しきい値を上げて足をより高く上げるよう促す
 
         # self.rewards.undesired_contacts = None
 
@@ -88,8 +88,8 @@ class UnitreeGo2RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         # self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
         # self.commands.base_velocity.rel_standing_envs = 0.1
         # base_velocity - 後ろ向き・右向き歩行を改善するための設定
-        self.commands.base_velocity.ranges.lin_vel_x = (-1.5, 1.0)  # 後ろ向き歩行を有効化
-        self.commands.base_velocity.ranges.lin_vel_y = (-1.0, 0.5)  # 右向き歩行を有効化
+        self.commands.base_velocity.ranges.lin_vel_x = (-1.3, 1.0)  # 後ろ向き歩行を有効化
+        self.commands.base_velocity.ranges.lin_vel_y = (-0.8, 0.5)  # 右向き歩行を有効化
         self.commands.base_velocity.rel_standing_envs = 0.1  # ロボット自身の向きに依存した速度コマンド割合を増やす
 
         # self.events.add_base_mass.params["mass_distribution_params"] = (-1.0, 3.0)
