@@ -29,7 +29,7 @@ from isaaclab.utils.assets import ISAACLAB_NUCLEUS_DIR
 
 GO1_ACTUATOR_CFG = ActuatorNetMLPCfg(
     joint_names_expr=[".*_hip_joint", ".*_thigh_joint", ".*_calf_joint"],
-    network_file=f"{ISAACLAB_NUCLEUS_DIR}/ActuatorNets/Unitree/unitree_go1.pt",
+    network_file=f"{ISAACLAB_NUCLEUS_DIR}/ActuatorNets/Unitree/unitree_go2.pt",
     pos_scale=-1.0,
     vel_scale=1.0,
     torque_scale=1.0,
@@ -188,12 +188,14 @@ UNITREE_GO2_CFG = ArticulationCfg(
         # "base_legs": GO2_ACTUATOR_CFG,
         "base_legs": DelayedDCMotorCfg(
             joint_names_expr=[".*_hip_joint", ".*_thigh_joint", ".*_calf_joint"],
-            effort_limit=23.5,
-            saturation_effort=23.5,
+            # effort_limit=23.5,
+            effort_limit=23.7,
+            # saturation_effort=23.5,
+            saturation_effort=23.7,
             velocity_limit=30.0,
             stiffness=25.0,
             damping=0.5,
-            friction=0.1,
+            friction=0.001,
         ),
     },
 )

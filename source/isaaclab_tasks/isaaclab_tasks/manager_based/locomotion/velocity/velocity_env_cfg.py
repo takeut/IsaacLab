@@ -42,11 +42,30 @@ class MySceneCfg(InteractiveSceneCfg):
     """Configuration for the terrain scene with a legged robot."""
 
     # ground terrain
+    # terrain = TerrainImporterCfg(
+    #     prim_path="/World/ground",
+    #     terrain_type="generator",
+    #     terrain_generator=ROUGH_TERRAINS_CFG,
+    #     max_init_terrain_level=5,
+    #     collision_group=-1,
+    #     physics_material=sim_utils.RigidBodyMaterialCfg(
+    #         friction_combine_mode="multiply",
+    #         restitution_combine_mode="multiply",
+    #         static_friction=1.0,
+    #         dynamic_friction=1.0,
+    #     ),
+    #     visual_material=sim_utils.MdlFileCfg(
+    #         mdl_path=f"{ISAACLAB_NUCLEUS_DIR}/Materials/TilesMarbleSpiderWhiteBrickBondHoned/TilesMarbleSpiderWhiteBrickBondHoned.mdl",
+    #         project_uvw=True,
+    #         texture_scale=(0.25, 0.25),
+    #     ),
+    #     debug_vis=False,
+    # )
     terrain = TerrainImporterCfg(
         prim_path="/World/ground",
         terrain_type="generator",
         terrain_generator=ROUGH_TERRAINS_CFG,
-        max_init_terrain_level=5,
+        max_init_terrain_level=9,
         collision_group=-1,
         physics_material=sim_utils.RigidBodyMaterialCfg(
             friction_combine_mode="multiply",
@@ -55,9 +74,8 @@ class MySceneCfg(InteractiveSceneCfg):
             dynamic_friction=1.0,
         ),
         visual_material=sim_utils.MdlFileCfg(
-            mdl_path=f"{ISAACLAB_NUCLEUS_DIR}/Materials/TilesMarbleSpiderWhiteBrickBondHoned/TilesMarbleSpiderWhiteBrickBondHoned.mdl",
+            mdl_path="{NVIDIA_NUCLEUS_DIR}/Materials/Base/Architecture/Shingles_01.mdl",
             project_uvw=True,
-            texture_scale=(0.25, 0.25),
         ),
         debug_vis=False,
     )
@@ -105,7 +123,8 @@ class CommandsCfg:
 
     base_velocity = mdp.UniformVelocityCommandCfg(
         asset_name="robot",
-        resampling_time_range=(10.0, 10.0),
+        # resampling_time_range=(10.0, 10.0),
+        resampling_time_range=(4.0, 10.0),
         rel_standing_envs=0.02,
         rel_heading_envs=1.0,
         heading_command=True,
@@ -199,10 +218,12 @@ class EventCfg:
             # Go1ガイドの推奨ドメインランダマイゼーション範囲
             # "static_friction_range": (0.8, 0.8),
             # "dynamic_friction_range": (0.6, 0.6),
-            "static_friction_range": (0.6, 1.2),  # Go1ガイド推奨値
-            "dynamic_friction_range": (0.4, 1.0),  # Go1ガイド推奨値
-            "restitution_range": (0.0, 0.0),
+            "static_friction_range": (0.3, 1.25),  # https://github.com/isaac-sim/IsaacLab/issues/1784
+            "dynamic_friction_range": (0.3, 1.25),  # Go1ガイド推奨値
+            # "restitution_range": (0.0, 0.0),
+            "restitution_range": (0.0, 0.15),
             "num_buckets": 64,
+            "make_consistent": True,
         },
     )
 
