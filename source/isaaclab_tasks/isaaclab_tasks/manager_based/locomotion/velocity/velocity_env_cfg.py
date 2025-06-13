@@ -394,7 +394,7 @@ class LocomotionVelocityRoughEnvCfg(ManagerBasedRLEnvCfg):
         self.episode_length_s = 20.0
         # simulation settings
         # self.sim.dt = 0.005
-        self.sim.dt = 10.0 / 60.0 # https://github.com/isaac-sim/IsaacLab/issues/1784
+        # self.sim.dt = 0.1 / 60.0 # https://github.com/isaac-sim/IsaacLab/issues/1784
         # self.sim.dt = 0.1 # https://github.com/isaac-sim/IsaacLab/issues/1784
         self.sim.render_interval = self.decimation
         self.sim.physics_material = self.scene.terrain.physics_material
