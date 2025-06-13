@@ -195,7 +195,7 @@ UNITREE_GO2_CFG = ArticulationCfg(
             velocity_limit=30.0,
             stiffness=25.0,
             damping=0.5,
-            friction=0.001,
+            # friction=0.0001,
         ),
     },
 )
