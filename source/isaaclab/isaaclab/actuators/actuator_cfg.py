@@ -205,7 +205,7 @@ class DelayedDCMotorCfg(DCMotorCfg):
         シミュレータ: 0-1程度
         実機推奨: dt 5ms なので 10 で 10ms
     """
-    friction: float = 0.03
+    friction: float = 0.001
 
 
 @configclass
