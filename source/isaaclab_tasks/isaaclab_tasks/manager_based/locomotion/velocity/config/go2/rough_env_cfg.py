@@ -99,6 +99,9 @@ class UnitreeGo2RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
 
         self.actions.joint_pos.scale= 0.45 # from 0.5
 
+        # no height scan
+        self.scene.height_scanner = None
+
 @configclass
 class UnitreeGo2RoughEnvCfg_PLAY(UnitreeGo2RoughEnvCfg):
     def __post_init__(self):
