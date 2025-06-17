@@ -23,10 +23,10 @@ class UnitreeGo2RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/base"
         # no height scan
         self.scene.height_scanner = None
-        # self.observations.policy.height_scan = None
-        self.observations.policy.base_lin_vel = None
-        # self.observations.critic.height_scan = None
-        self.observations.critic.base_lin_vel = None
+        self.observations.policy.height_scan = None
+        # self.observations.policy.base_lin_vel = None
+        self.observations.critic.height_scan = None
+        # self.observations.critic.base_lin_vel = None
         
         # add by kobayashi
         # self.scene.robot.init_state.pos = (0.0, 0.0, 0.2)  # 初期位置を変更
