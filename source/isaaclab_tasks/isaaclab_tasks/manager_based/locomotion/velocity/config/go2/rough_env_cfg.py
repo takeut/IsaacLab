@@ -21,6 +21,12 @@ class UnitreeGo2RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
 
         self.scene.robot = UNITREE_GO2_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
         self.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/base"
+        # no height scan
+        self.scene.height_scanner = None
+        # self.observations.policy.height_scan = None
+        self.observations.policy.base_lin_vel = None
+        # self.observations.critic.height_scan = None
+        self.observations.critic.base_lin_vel = None
         
         # add by kobayashi
         # self.scene.robot.init_state.pos = (0.0, 0.0, 0.2)  # 初期位置を変更
@@ -99,9 +105,6 @@ class UnitreeGo2RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
 
         self.actions.joint_pos.scale= 0.45 # from 0.5
 
-        # no height scan
-        self.scene.height_scanner = None
-
 @configclass
 class UnitreeGo2RoughEnvCfg_PLAY(UnitreeGo2RoughEnvCfg):
     def __post_init__(self):
@@ -126,7 +129,7 @@ class UnitreeGo2RoughEnvCfg_PLAY(UnitreeGo2RoughEnvCfg):
         # self.events.push_robot = None  # コメントアウト（velocity_env_cfgでpush_robotがコメントアウトされているため）
 
         #add by kobayashi 
-        if hasattr(self.observations.policy, "height_scan"):
-            del self.observations.policy.height_scan
-        if hasattr(self.observations.policy, "base_lin_vel"):
-            del self.observations.policy.base_lin_vel
+        # if hasattr(self.observations.policy, "height_scan"):
+        #     del self.observations.policy.height_scan
+        # if hasattr(self.observations.policy, "base_lin_vel"):
+        #     del self.observations.policy.base_lin_vel
