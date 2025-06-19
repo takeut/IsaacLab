@@ -33,9 +33,21 @@ class UnitreeGo2RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         # self.scene.robot.init_state.rot = (1.0, 0.0, 0.0, 0.0)  # 横倒れ（x軸に90度回転）
 
         # scale down the terrains because the robot is small
-        self.scene.terrain.terrain_generator.sub_terrains["boxes"].grid_height_range = (0.025, 0.1)
-        self.scene.terrain.terrain_generator.sub_terrains["random_rough"].noise_range = (0.01, 0.06)
-        self.scene.terrain.terrain_generator.sub_terrains["random_rough"].noise_step = 0.01
+        # self.scene.terrain.terrain_generator.sub_terrains["boxes"].grid_height_range = (0.025, 0.1)
+        # self.scene.terrain.terrain_generator.sub_terrains["random_rough"].noise_range = (0.01, 0.06)
+        # self.scene.terrain.terrain_generator.sub_terrains["random_rough"].noise_step = 0.01
+        self.scene.terrain.max_init_terrain_level = 1
+        self.scene.terrain.terrain_generator.sub_terrains["pyramid_stairs"].step_height_range = (0.001, 0.1) # from (0.05, 0.23)
+        self.scene.terrain.terrain_generator.sub_terrains["pyramid_stairs"].step_width = 0.1 # from 0.3
+        self.scene.terrain.terrain_generator.sub_terrains["pyramid_stairs_inv"].step_height_range = (0.001, 0.1) # from (0.05, 0.23)
+        self.scene.terrain.terrain_generator.sub_terrains["pyramid_stairs_inv"].step_width = 0.1 # from 0.3
+        self.scene.terrain.terrain_generator.sub_terrains["boxes"].grid_height_range = (0.001, 0.08) # from (0.05, 0.2)
+        self.scene.terrain.terrain_generator.sub_terrains["random_rough"].noise_range = (0.001, 0.05) # from (0.02, 0.10)
+        self.scene.terrain.terrain_generator.sub_terrains["random_rough"].noise_step = 0.03 # from 0.02
+        self.scene.terrain.terrain_generator.sub_terrains["hf_pyramid_slope"].noise_step = (0.0, 0.1) # from (0.0, 0.4)
+        self.scene.terrain.terrain_generator.sub_terrains["hf_pyramid_slope_inv"].noise_step = (0.0, 0.1) # from (0.0, 0.4)
+        self.scene.terrain.physics_material.static_friction = 2.0 # from 1.0
+        self.scene.terrain.physics_material.dynamic_friction = 1.5 # from 1.0
 
         # reduce action scale
         self.actions.joint_pos.scale = 0.35 # from 0.5.
@@ -59,7 +71,7 @@ class UnitreeGo2RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
 
         # rewards for feet - 足を上げるための報酬を調整
         self.rewards.feet_air_time.params["sensor_cfg"].body_names = ".*_foot"
-        self.rewards.feet_air_time.weight = 5.0  # 少し有効化して足が空中にある時間を増やす
+        self.rewards.feet_air_time.weight = 4.0  # 少し有効化して足が空中にある時間を増やす
         self.rewards.feet_clearance.weight = 1.5  # 有効化して足のクリアランスを増やす
         # self.rewards.feet_air_time.weight = 0.0  # 無効化
         # self.rewards.feet_clearance.weight = 0  # 無効化
